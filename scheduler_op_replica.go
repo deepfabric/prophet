@@ -14,15 +14,15 @@ var (
 	RemovePeer = ChangePeerType(1)
 )
 
-func newAddPeerAggregationOp(target *ResourceRuntime, peer *Peer) Operator {
+func newAddPeerAggregationOp(cfg *Cfg, target *ResourceRuntime, peer *Peer) Operator {
 	addPeerOp := newAddPeerOp(target.meta.ID(), peer)
-	return newAggregationOp(target, addPeerOp)
+	return newAggregationOp(cfg, target, addPeerOp)
 }
 
-func newTransferPeerAggregationOp(target *ResourceRuntime, oldPeer, newPeer *Peer) Operator {
+func newTransferPeerAggregationOp(cfg *Cfg, target *ResourceRuntime, oldPeer, newPeer *Peer) Operator {
 	addPeer := newAddPeerOp(target.meta.ID(), newPeer)
 	removePeer := newRemovePeerOp(target.meta.ID(), oldPeer)
-	return newAggregationOp(target, addPeer, removePeer)
+	return newAggregationOp(cfg, target, addPeer, removePeer)
 }
 
 func newAddPeerOp(id uint64, peer *Peer) *changePeerOperator {
@@ -82,5 +82,5 @@ func (op *changePeerOperator) Do(target *ResourceRuntime) (*resourceHeartbeatRsp
 		}
 	}
 
-	return newChangePeerRsp(op.ID, op.Peer.ID, op.Type), false
+	return newChangePeerRsp(op.ID, op.Peer, op.Type), false
 }

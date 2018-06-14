@@ -5,17 +5,19 @@ import (
 )
 
 type balanceResourceLeaderScheduler struct {
+	cfg      *Cfg
 	limit    uint64
 	selector Selector
 }
 
-func newBalanceResourceLeaderScheduler() Scheduler {
+func newBalanceResourceLeaderScheduler(cfg *Cfg) Scheduler {
 	var filters []Filter
 	filters = append(filters, NewBlockFilter())
-	filters = append(filters, NewStateFilter())
-	filters = append(filters, NewHealthFilter())
+	filters = append(filters, NewStateFilter(cfg))
+	filters = append(filters, NewHealthFilter(cfg))
 
 	return &balanceResourceLeaderScheduler{
+		cfg:      cfg,
 		limit:    1,
 		selector: newBalanceSelector(LeaderKind, filters),
 	}
@@ -30,7 +32,7 @@ func (l *balanceResourceLeaderScheduler) ResourceKind() ResourceKind {
 }
 
 func (l *balanceResourceLeaderScheduler) ResourceLimit() uint64 {
-	return minUint64(l.limit, cfg.MaxRebalanceLeader)
+	return minUint64(l.limit, l.cfg.MaxRebalanceLeader)
 }
 
 func (l *balanceResourceLeaderScheduler) Prepare(rt *Runtime) error { return nil }
@@ -50,7 +52,7 @@ func (l *balanceResourceLeaderScheduler) Schedule(rt *Runtime) Operator {
 	}
 	l.limit = adjustBalanceLimit(rt, l.ResourceKind())
 
-	return newTransferLeaderAggregationOp(res, newLeader)
+	return newTransferLeaderAggregationOp(l.cfg, res, newLeader)
 }
 
 // scheduleTransferLeader schedules a resource to transfer leader to the peer.

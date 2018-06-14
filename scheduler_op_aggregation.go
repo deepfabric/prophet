@@ -7,6 +7,7 @@ import (
 
 // aggregationOperator is the aggregations all operator on the same resource
 type aggregationOperator struct {
+	cfg       *Cfg
 	ID        uint64     `json:"id"`
 	StartAt   time.Time  `json:"startAt"`
 	EndAt     time.Time  `json:"endAt"`
@@ -14,12 +15,13 @@ type aggregationOperator struct {
 	Ops       []Operator `json:"ops"`
 }
 
-func newAggregationOp(target *ResourceRuntime, ops ...Operator) Operator {
+func newAggregationOp(cfg *Cfg, target *ResourceRuntime, ops ...Operator) Operator {
 	if len(ops) == 0 {
 		log.Fatal("prophet: create new resource aggregation operator use empty opts")
 	}
 
 	return &aggregationOperator{
+		cfg:     cfg,
 		ID:      target.meta.ID(),
 		StartAt: time.Now(),
 		Ops:     ops,
@@ -39,7 +41,7 @@ func (op *aggregationOperator) ResourceKind() ResourceKind {
 }
 
 func (op *aggregationOperator) Do(target *ResourceRuntime) (*resourceHeartbeatRsp, bool) {
-	if time.Since(op.StartAt) > cfg.TimeoutWaitOperatorComplete {
+	if time.Since(op.StartAt) > op.cfg.TimeoutWaitOperatorComplete {
 		log.Errorf("prophet: operator %s timeout", op)
 		return nil, true
 	}

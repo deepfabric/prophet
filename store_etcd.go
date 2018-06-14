@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/fagongzi/util/format"
 )
 
 const (
@@ -19,6 +21,8 @@ const (
 	DefaultRequestTimeout = 10 * time.Second
 	// DefaultSlowRequestTime default slow request time
 	DefaultSlowRequestTime = time.Second * 1
+
+	idBatch = 1000
 )
 
 var (
@@ -42,20 +46,33 @@ func getCurrentClusterMembers(client *clientv3.Client) (*clientv3.MemberListResp
 }
 
 type etcdStore struct {
+	sync.Mutex
+	adapter       Adapter
 	client        *clientv3.Client
+	namespace     string
 	idPath        string
 	leaderPath    string
 	resourcePath  string
 	containerPath string
+	clusterPath   string
+
+	store     Store
+	signature string
+	base      uint64
+	end       uint64
 }
 
-func newEtcdStore(client *clientv3.Client, namespace string) Store {
+func newEtcdStore(client *clientv3.Client, namespace string, adapter Adapter, signature string) Store {
 	return &etcdStore{
+		adapter:       adapter,
 		client:        client,
+		namespace:     namespace,
+		signature:     signature,
 		idPath:        fmt.Sprintf("%s/meta/id", namespace),
 		leaderPath:    fmt.Sprintf("%s/meta/leader", namespace),
 		resourcePath:  fmt.Sprintf("%s/meta/resources", namespace),
 		containerPath: fmt.Sprintf("%s/meta/containers", namespace),
+		clusterPath:   fmt.Sprintf("%s/cluster", namespace),
 	}
 }
 
@@ -78,8 +95,8 @@ func (s *etcdStore) GetCurrentLeader() (*Node, error) {
 	return v, nil
 }
 
-func (s *etcdStore) ResignLeader(leaderSignature string) error {
-	resp, err := s.leaderTxn(leaderSignature).Then(clientv3.OpDelete(s.leaderPath)).Commit()
+func (s *etcdStore) ResignLeader() error {
+	resp, err := s.leaderTxn(s.signature).Then(clientv3.OpDelete(s.leaderPath)).Commit()
 	if err != nil {
 		return err
 	}
@@ -119,7 +136,7 @@ func (s *etcdStore) WatchLeader() {
 	}
 }
 
-func (s *etcdStore) CampaignLeader(leaderSignature string, leaderLeaseTTL int64, enableLeaderFun, disableLeaderFun func()) error {
+func (s *etcdStore) CampaignLeader(leaderLeaseTTL int64, enableLeaderFun, disableLeaderFun func()) error {
 	lessor := clientv3.NewLease(s.client)
 	defer lessor.Close()
 
@@ -139,7 +156,7 @@ func (s *etcdStore) CampaignLeader(leaderSignature string, leaderLeaseTTL int64,
 	// The leader key must not exist, so the CreateRevision is 0.
 	resp, err := s.txn().
 		If(clientv3.Compare(clientv3.CreateRevision(s.leaderPath), "=", 0)).
-		Then(clientv3.OpPut(s.leaderPath, leaderSignature, clientv3.WithLease(clientv3.LeaseID(leaseResp.ID)))).
+		Then(clientv3.OpPut(s.leaderPath, s.signature, clientv3.WithLease(clientv3.LeaseID(leaseResp.ID)))).
 		Commit()
 	if err != nil {
 		return err
@@ -181,6 +198,23 @@ func (s *etcdStore) PutContainer(meta Container) error {
 	return s.save(key, string(data))
 }
 
+// GetContainer returns the spec container
+func (s *etcdStore) GetContainer(id uint64) (Container, error) {
+	key := s.getKey(id, s.containerPath)
+	data, err := s.getValue(key)
+	if err != nil {
+		return nil, err
+	}
+
+	c := s.adapter.NewContainer()
+	err = c.Unmarshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
 // PutResource returns nil if resource is add or update succ
 func (s *etcdStore) PutResource(meta Resource) error {
 	key := s.getKey(meta.ID(), s.resourcePath)
@@ -206,7 +240,7 @@ func (s *etcdStore) LoadResources(limit int64, do func(Resource)) error {
 		}
 
 		for _, item := range resp.Kvs {
-			v := cfg.resourceFactory()
+			v := s.adapter.NewResource()
 			err := v.Unmarshal(item.Value)
 			if err != nil {
 				return err
@@ -239,7 +273,7 @@ func (s *etcdStore) LoadContainers(limit int64, do func(Container)) error {
 		}
 
 		for _, item := range resp.Kvs {
-			v := cfg.containerFactory()
+			v := s.adapter.NewContainer()
 			err := v.Unmarshal(item.Value)
 			if err != nil {
 				return err
@@ -259,7 +293,134 @@ func (s *etcdStore) LoadContainers(limit int64, do func(Container)) error {
 }
 
 func (s *etcdStore) AllocID() (uint64, error) {
-	return 0, nil
+	s.Lock()
+	defer s.Unlock()
+
+	if s.base == s.end {
+		end, err := s.generate()
+		if err != nil {
+			return 0, err
+		}
+
+		s.end = end
+		s.base = s.end - idBatch
+	}
+
+	s.base++
+	return s.base, nil
+}
+
+func (s *etcdStore) generate() (uint64, error) {
+	value, err := s.getID()
+	if err != nil {
+		return 0, err
+	}
+
+	max := value + idBatch
+
+	// create id
+	if value == 0 {
+		max := value + idBatch
+		err := s.createID(s.signature, max)
+		if err != nil {
+			return 0, err
+		}
+
+		return max, nil
+	}
+
+	err = s.updateID(s.signature, value, max)
+	if err != nil {
+		return 0, err
+	}
+
+	return max, nil
+}
+
+// PutBootstrapped put cluster is bootstrapped
+func (s *etcdStore) PutBootstrapped(container Container, res Resource) (bool, error) {
+	ctx, cancel := context.WithTimeout(s.client.Ctx(), DefaultTimeout)
+	defer cancel()
+
+	// build operations
+	var ops []clientv3.Op
+
+	meta, err := container.Marshal()
+	if err != nil {
+		return false, err
+	}
+	ops = append(ops, clientv3.OpPut(s.getKey(container.ID(), s.containerPath), string(meta)))
+
+	meta, err = res.Marshal()
+	if err != nil {
+		return false, err
+	}
+	ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
+	ops = append(ops, clientv3.OpPut(s.clusterPath, string(meta)))
+
+	// txn
+	resp, err := s.client.Txn(ctx).
+		If(clientv3.Compare(clientv3.CreateRevision(s.clusterPath), "=", 0)).
+		Then(ops...).
+		Commit()
+
+	if err != nil {
+		return false, err
+	}
+
+	log.Infof("*************************************resp: %+v", resp)
+
+	// already bootstrapped
+	if !resp.Succeeded {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *etcdStore) getID() (uint64, error) {
+	resp, err := s.getValue(s.idPath)
+	if err != nil {
+		return 0, err
+	}
+
+	if resp == nil {
+		return 0, nil
+	}
+
+	return format.BytesToUint64(resp)
+}
+
+func (s *etcdStore) createID(leaderSignature string, value uint64) error {
+	cmp := clientv3.Compare(clientv3.CreateRevision(s.idPath), "=", 0)
+	op := clientv3.OpPut(s.idPath, string(format.Uint64ToBytes(value)))
+	resp, err := s.leaderTxn(leaderSignature, cmp).Then(op).Commit()
+
+	if err != nil {
+		return err
+	}
+
+	if !resp.Succeeded {
+		return errMaybeNotLeader
+	}
+
+	return nil
+}
+
+func (s *etcdStore) updateID(leaderSignature string, old, value uint64) error {
+	cmp := clientv3.Compare(clientv3.Value(s.idPath), "=", string(format.Uint64ToBytes(old)))
+	op := clientv3.OpPut(s.idPath, string(format.Uint64ToBytes(value)))
+	resp, err := s.leaderTxn(leaderSignature, cmp).Then(op).Commit()
+
+	if err != nil {
+		return err
+	}
+
+	if !resp.Succeeded {
+		return errMaybeNotLeader
+	}
+
+	return nil
 }
 
 func (s *etcdStore) getKey(id uint64, base string) string {

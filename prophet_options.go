@@ -7,80 +7,39 @@ import (
 )
 
 type options struct {
-	namespace string
-	leaseTTL  int64
-	id        uint64
-	client    *clientv3.Client
-
-	resourceHBFetch   func() []*ResourceHeartbeatReq
-	resourceInterval  time.Duration
-	containerHBFetch  func() *ContainerHeartbeatReq
-	containerInterval time.Duration
-
-	hbHandler HeartbeatHandler
-
-	cfg *Cfg
+	client *clientv3.Client
+	cfg    *Cfg
 }
 
 func (opts *options) adjust() {
-	if opts.leaseTTL == 0 {
-		opts.leaseTTL = 5
-	}
-
-	if opts.namespace == "" {
-		opts.namespace = "/prophet"
-	}
-
 	if opts.client == nil {
 		log.Fatalf("etcd v3 client is not setting, using WithExternalEtcd or WithEmbeddedEtcd to initialize.")
 	}
 
-	if opts.hbHandler == nil {
-		log.Fatalf("heartbeat handler must be set.")
-	}
-
 	opts.cfg.adujst()
-	cfg = opts.cfg
 }
 
 // Option is prophet create option
 type Option func(*options)
 
 // WithExternalEtcd using  external etcd cluster
-func WithExternalEtcd(id uint64, client *clientv3.Client) Option {
+func WithExternalEtcd(client *clientv3.Client) Option {
 	return func(opts *options) {
 		opts.client = client
-		opts.id = id
 	}
 }
 
 // WithEmbeddedEtcd using embedded etcd cluster
 func WithEmbeddedEtcd(cfg *EmbeddedEtcdCfg) Option {
 	return func(opts *options) {
-		opts.id, opts.client = initWithEmbedEtcd(cfg)
+		opts.client = initWithEmbedEtcd(cfg)
 	}
 }
 
 // WithLeaseTTL prophet leader lease ttl
 func WithLeaseTTL(leaseTTL int64) Option {
 	return func(opts *options) {
-		opts.leaseTTL = leaseTTL
-	}
-}
-
-// WithResourceHeartbeat fetch resource info
-func WithResourceHeartbeat(fetch func() []*ResourceHeartbeatReq, interval time.Duration) Option {
-	return func(opts *options) {
-		opts.resourceHBFetch = fetch
-		opts.resourceInterval = interval
-	}
-}
-
-// WithContainerHeartbeat fetch container info
-func WithContainerHeartbeat(fetch func() *ContainerHeartbeatReq, interval time.Duration) Option {
-	return func(opts *options) {
-		opts.containerHBFetch = fetch
-		opts.containerInterval = interval
+		opts.cfg.LeaseTTL = leaseTTL
 	}
 }
 
@@ -161,6 +120,13 @@ func WithMinAvailableStorageUsedRate(value int) Option {
 	}
 }
 
+// WithNamespace set namespace
+func WithNamespace(value string) Option {
+	return func(opts *options) {
+		opts.cfg.Namespace = value
+	}
+}
+
 // WithMaxLimitSnapshotsCount maximum count of node about snapshot
 func WithMaxLimitSnapshotsCount(value uint64) Option {
 	return func(opts *options) {
@@ -175,30 +141,37 @@ func WithLocationLabels(value []string) Option {
 	}
 }
 
-// WithResourceFactory resource factory method
-func WithResourceFactory(value func() Resource) Option {
-	return func(opts *options) {
-		opts.cfg.resourceFactory = value
-	}
-}
-
-// WithContainerFactory container factory method
-func WithContainerFactory(value func() Container) Option {
-	return func(opts *options) {
-		opts.cfg.containerFactory = value
-	}
-}
-
 // WithScheduler add a scheduler
 func WithScheduler(value Scheduler) Option {
 	return func(opts *options) {
-		opts.cfg.schedulers = append(opts.cfg.schedulers, value)
+		opts.cfg.Schedulers = append(opts.cfg.Schedulers, value)
 	}
 }
 
-// WithHeartbeatHandler using a heartbeat handler
-func WithHeartbeatHandler(handler HeartbeatHandler) Option {
+// WithRoleChangeHandler using a role changed handler
+func WithRoleChangeHandler(Handler RoleChangeHandler) Option {
 	return func(opts *options) {
-		opts.hbHandler = handler
+		opts.cfg.Handler = Handler
+	}
+}
+
+// WithMaxRPCCons set MaxRPCCons
+func WithMaxRPCCons(value int) Option {
+	return func(opts *options) {
+		opts.cfg.MaxRPCCons = value
+	}
+}
+
+// WithMaxRPCConnIdle set MaxRPCConnIdle
+func WithMaxRPCConnIdle(value time.Duration) Option {
+	return func(opts *options) {
+		opts.cfg.MaxRPCConnIdle = value
+	}
+}
+
+// WithMaxRPCTimeout set MaxRPCTimeout
+func WithMaxRPCTimeout(value time.Duration) Option {
+	return func(opts *options) {
+		opts.cfg.MaxRPCTimeout = value
 	}
 }

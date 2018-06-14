@@ -9,13 +9,13 @@ import (
 
 // HeartbeatHandler handle for heartbeat rsp
 type HeartbeatHandler interface {
-	ChangeLeader(resourceID, newLeaderPeerID uint64)
-	ChangePeer(resourceID, targetPeerID uint64, changeType ChangePeerType)
+	ChangeLeader(resourceID uint64, newLeader *Peer)
+	ChangePeer(resourceID uint64, peer *Peer, changeType ChangePeerType)
 }
 
 func (p *Prophet) startResourceHeartbeatLoop() {
 	p.runner.RunCancelableTask(func(ctx context.Context) {
-		ticker := time.NewTicker(p.opts.resourceInterval)
+		ticker := time.NewTicker(p.adapter.ResourceHBInterval())
 		defer ticker.Stop()
 
 		var conn goetty.IOSession
@@ -31,38 +31,36 @@ func (p *Prophet) startResourceHeartbeatLoop() {
 					conn = p.getLeaderClient()
 				}
 
-				hbs := p.opts.resourceHBFetch()
+				hbs := p.adapter.FetchAllResourceHB()
 				var err error
-			OUTER:
 				for _, hb := range hbs {
-					for {
-						err = conn.WriteAndFlush(hb)
-						if err != nil {
-							conn.Close()
-							conn = nil
-							log.Errorf("prophet: send resource heartbeat failed, errors: %+v", err)
-							break OUTER
-						}
+					err = conn.WriteAndFlush(hb)
+					if err != nil {
+						conn.Close()
+						conn = nil
+						log.Errorf("prophet: send resource heartbeat failed, errors: %+v", err)
+						break
+					}
 
-						// read rsp
-						msg, err := conn.Read()
-						if err != nil {
-							conn.Close()
-							conn = nil
-							log.Errorf("prophet: read heartbeat rsp failed, errors: %+v", err)
-							break OUTER
-						}
+					// read rsp
+					msg, err := conn.ReadTimeout(p.cfg.MaxRPCTimeout)
+					if err != nil {
+						conn.Close()
+						conn = nil
+						log.Errorf("prophet: read heartbeat rsp failed, errors: %+v", err)
+						break
+					}
 
-						if rsp, ok := msg.(*errorRsp); ok {
-							conn.Close()
-							conn = nil
-							log.Infof("prophet: read heartbeat rsp with error %s", rsp.err)
-						} else if rsp, ok := msg.(*resourceHeartbeatRsp); ok {
-							if rsp.NewLeaderPeerID > 0 {
-								p.opts.hbHandler.ChangeLeader(rsp.ResourceID, rsp.NewLeaderPeerID)
-							} else if rsp.TargetPeerID > 0 {
-								p.opts.hbHandler.ChangePeer(rsp.ResourceID, rsp.TargetPeerID, rsp.ChangeType)
-							}
+					if rsp, ok := msg.(*errorRsp); ok {
+						conn.Close()
+						conn = nil
+						log.Infof("prophet: read heartbeat rsp with error %s", rsp.Err)
+						break
+					} else if rsp, ok := msg.(*resourceHeartbeatRsp); ok {
+						if rsp.NewLeader != nil {
+							p.adapter.HBHandler().ChangeLeader(rsp.ResourceID, rsp.NewLeader)
+						} else if rsp.Peer != nil {
+							p.adapter.HBHandler().ChangePeer(rsp.ResourceID, rsp.Peer, rsp.ChangeType)
 						}
 					}
 				}
@@ -73,7 +71,7 @@ func (p *Prophet) startResourceHeartbeatLoop() {
 
 func (p *Prophet) startContainerHeartbeatLoop() {
 	p.runner.RunCancelableTask(func(ctx context.Context) {
-		ticker := time.NewTicker(p.opts.containerInterval)
+		ticker := time.NewTicker(p.adapter.ContainerHBInterval())
 		defer ticker.Stop()
 
 		var conn goetty.IOSession
@@ -89,7 +87,11 @@ func (p *Prophet) startContainerHeartbeatLoop() {
 					conn = p.getLeaderClient()
 				}
 
-				req := p.opts.containerHBFetch()
+				req := p.adapter.FetchContainerHB()
+				if req == nil {
+					continue
+				}
+
 				err := conn.WriteAndFlush(req)
 				if err != nil {
 					conn.Close()
@@ -99,7 +101,7 @@ func (p *Prophet) startContainerHeartbeatLoop() {
 				}
 
 				// read rsp
-				msg, err := conn.Read()
+				msg, err := conn.ReadTimeout(p.cfg.MaxRPCTimeout)
 				if err != nil {
 					conn.Close()
 					conn = nil
@@ -110,7 +112,7 @@ func (p *Prophet) startContainerHeartbeatLoop() {
 				if rsp, ok := msg.(*errorRsp); ok {
 					conn.Close()
 					conn = nil
-					log.Infof("prophet: read heartbeat rsp with error %s", rsp.err)
+					log.Infof("prophet: read heartbeat rsp with error %s", rsp.Err)
 				}
 			}
 		}

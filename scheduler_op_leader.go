@@ -4,9 +4,9 @@ import (
 	"fmt"
 )
 
-func newTransferLeaderAggregationOp(target *ResourceRuntime, newLeader *Peer) Operator {
+func newTransferLeaderAggregationOp(cfg *Cfg, target *ResourceRuntime, newLeader *Peer) Operator {
 	transferLeader := newTransferLeaderOperator(target.meta.ID(), target.leaderPeer, newLeader)
-	return newAggregationOp(target, transferLeader)
+	return newAggregationOp(cfg, target, transferLeader)
 }
 
 type transferLeaderOperator struct {
@@ -43,5 +43,5 @@ func (op *transferLeaderOperator) Do(info *ResourceRuntime) (*resourceHeartbeatR
 		return nil, true
 	}
 
-	return newChangeLeaderRsp(op.ID, op.NewLeader.ID), false
+	return newChangeLeaderRsp(op.ID, op.NewLeader), false
 }

@@ -27,9 +27,11 @@ func filterTarget(container *ContainerRuntime, filters []Filter) bool {
 }
 
 type stateFilter struct {
+	cfg *Cfg
 }
 
 type storageThresholdFilter struct {
+	cfg *Cfg
 }
 
 type excludedFilter struct {
@@ -38,6 +40,7 @@ type excludedFilter struct {
 }
 
 type healthFilter struct {
+	cfg *Cfg
 }
 
 type cacheFilter struct {
@@ -45,21 +48,23 @@ type cacheFilter struct {
 }
 
 type distinctScoreFilter struct {
+	cfg        *Cfg
 	containers []*ContainerRuntime
 	safeScore  float64
 }
 
 type snapshotCountFilter struct {
+	cfg *Cfg
 }
 
 // NewStorageThresholdFilter returns a filter for choose resource container by storage rate
-func NewStorageThresholdFilter() Filter {
-	return &storageThresholdFilter{}
+func NewStorageThresholdFilter(cfg *Cfg) Filter {
+	return &storageThresholdFilter{cfg: cfg}
 }
 
 // NewStateFilter returns a filter for choose resource container by state
-func NewStateFilter() Filter {
-	return &stateFilter{}
+func NewStateFilter(cfg *Cfg) Filter {
+	return &stateFilter{cfg: cfg}
 }
 
 // NewExcludedFilter returns a filter for choose resource container by excluded value
@@ -71,8 +76,8 @@ func NewExcludedFilter(sources, targets map[uint64]struct{}) Filter {
 }
 
 // NewHealthFilter returns a filter for choose resource container by health info
-func NewHealthFilter() Filter {
-	return &healthFilter{}
+func NewHealthFilter(cfg *Cfg) Filter {
+	return &healthFilter{cfg: cfg}
 }
 
 // NewCacheFilter returns a filter for choose resource container by runtime cache
@@ -86,7 +91,7 @@ func NewBlockFilter() Filter {
 }
 
 // NewDistinctScoreFilter a filter for ensures that distinct score will not decrease.
-func NewDistinctScoreFilter(containers []*ContainerRuntime, source *ContainerRuntime) Filter {
+func NewDistinctScoreFilter(cfg *Cfg, containers []*ContainerRuntime, source *ContainerRuntime) Filter {
 	newContainers := make([]*ContainerRuntime, 0, len(containers)-1)
 	for _, s := range newContainers {
 		if s.meta.ID() == source.meta.ID() {
@@ -96,18 +101,19 @@ func NewDistinctScoreFilter(containers []*ContainerRuntime, source *ContainerRun
 	}
 
 	return &distinctScoreFilter{
+		cfg:        cfg,
 		containers: newContainers,
 		safeScore:  cfg.getDistinctScore(newContainers, source),
 	}
 }
 
 // NewSnapshotCountFilter returns snapshot filter
-func NewSnapshotCountFilter() Filter {
-	return &snapshotCountFilter{}
+func NewSnapshotCountFilter(cfg *Cfg) Filter {
+	return &snapshotCountFilter{cfg: cfg}
 }
 
 func (f *stateFilter) filter(container *ContainerRuntime) bool {
-	return !(container.IsUp() && container.Downtime() < cfg.MaxAllowContainerDownDuration)
+	return !(container.IsUp() && container.Downtime() < f.cfg.MaxAllowContainerDownDuration)
 }
 
 func (f *stateFilter) FilterSource(container *ContainerRuntime) bool {
@@ -123,7 +129,7 @@ func (f *storageThresholdFilter) FilterSource(container *ContainerRuntime) bool 
 }
 
 func (f *storageThresholdFilter) FilterTarget(container *ContainerRuntime) bool {
-	return container.StorageUsedRatio() > cfg.MinAvailableStorageUsedRate
+	return container.StorageUsedRatio() > f.cfg.MinAvailableStorageUsedRate
 }
 
 func (f *excludedFilter) FilterSource(container *ContainerRuntime) bool {
@@ -151,7 +157,7 @@ func (f *healthFilter) filter(container *ContainerRuntime) bool {
 		return true
 	}
 
-	return container.Downtime() > cfg.MaxAllowContainerDownDuration
+	return container.Downtime() > f.cfg.MaxAllowContainerDownDuration
 }
 
 func (f *healthFilter) FilterSource(container *ContainerRuntime) bool {
@@ -176,13 +182,13 @@ func (f *distinctScoreFilter) FilterSource(container *ContainerRuntime) bool {
 }
 
 func (f *distinctScoreFilter) FilterTarget(container *ContainerRuntime) bool {
-	return cfg.getDistinctScore(f.containers, container) < f.safeScore
+	return f.cfg.getDistinctScore(f.containers, container) < f.safeScore
 }
 
 func (f *snapshotCountFilter) filter(container *ContainerRuntime) bool {
-	return container.sendingSnapCount > cfg.MaxLimitSnapshotsCount ||
-		container.receivingSnapCount > cfg.MaxLimitSnapshotsCount ||
-		container.applyingSnapCount > cfg.MaxLimitSnapshotsCount
+	return container.sendingSnapCount > f.cfg.MaxLimitSnapshotsCount ||
+		container.receivingSnapCount > f.cfg.MaxLimitSnapshotsCount ||
+		container.applyingSnapCount > f.cfg.MaxLimitSnapshotsCount
 }
 
 func (f *snapshotCountFilter) FilterSource(container *ContainerRuntime) bool {

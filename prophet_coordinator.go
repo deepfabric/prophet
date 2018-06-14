@@ -10,34 +10,58 @@ import (
 type Coordinator struct {
 	sync.RWMutex
 
+	cfg        *Cfg
 	rt         *Runtime
 	checker    *replicaChecker
 	limiter    *scheduleLimiter
 	schedulers map[string]*scheduleController
 	opts       map[uint64]Operator
 
-	runner *Runner
+	runner  *Runner
+	tasks   []uint64
+	running bool
 }
 
-func newCoordinator(runner *Runner, rt *Runtime) *Coordinator {
+func newCoordinator(cfg *Cfg, runner *Runner, rt *Runtime) *Coordinator {
 	c := new(Coordinator)
 	c.limiter = newScheduleLimiter()
-	c.checker = newReplicaChecker(rt)
+	c.checker = newReplicaChecker(cfg, rt)
 	c.opts = make(map[uint64]Operator)
 	c.schedulers = make(map[string]*scheduleController)
 	c.runner = runner
 	c.rt = rt
+	c.cfg = cfg
 	return c
 }
 
 func (c *Coordinator) start() {
-	for _, s := range cfg.schedulers {
+	if c.running {
+		log.Warnf("prophet: coordinator is already started.")
+		return
+	}
+
+	for _, s := range c.cfg.Schedulers {
 		c.addScheduler(s)
 	}
+	c.running = true
 }
 
 func (c *Coordinator) stop() {
-	c.runner.Stop()
+	c.Lock()
+	defer c.Unlock()
+
+	c.running = false
+	for _, id := range c.tasks {
+		c.runner.StopCancelableTask(id)
+	}
+}
+
+func (c *Coordinator) isRunning() bool {
+	c.RLock()
+	value := c.running
+	c.RUnlock()
+
+	return value
 }
 
 func (c *Coordinator) addScheduler(scheduler Scheduler) error {
@@ -53,10 +77,14 @@ func (c *Coordinator) addScheduler(scheduler Scheduler) error {
 		return err
 	}
 
-	c.runner.RunCancelableTask(func(ctx context.Context) {
+	id, err := c.runner.RunCancelableTask(func(ctx context.Context) {
 		c.runScheduler(ctx, s)
 	})
+	if err != nil {
+		return err
+	}
 
+	c.tasks = append(c.tasks, id)
 	c.schedulers[s.Name()] = s
 	return nil
 }
@@ -111,7 +139,7 @@ func (c *Coordinator) runScheduler(ctx context.Context, s *scheduleController) {
 				continue
 			}
 
-			for i := 0; i < cfg.MaxScheduleRetries; i++ {
+			for i := 0; i < c.cfg.MaxScheduleRetries; i++ {
 				op := s.Schedule(c.rt)
 				if op == nil {
 					continue
@@ -138,7 +166,7 @@ func (c *Coordinator) dispatch(target *ResourceRuntime) *resourceHeartbeatRsp {
 	}
 
 	// Check replica operator.
-	if c.limiter.operatorCount(ReplicaKind) >= cfg.MaxScheduleReplica {
+	if c.limiter.operatorCount(ReplicaKind) >= c.cfg.MaxScheduleReplica {
 		return nil
 	}
 

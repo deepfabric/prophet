@@ -17,15 +17,12 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 	}
 
 	// resource meta is stale, return an error.
-	if current.meta.IsStale(source.meta) {
+	if current.meta.Stale(source.meta) {
 		return errStaleResource
 	}
 
-	rangeChanged := current.meta.RangeChanged(source.meta)
-	peersChanged := current.meta.PeerChanged(source.meta)
-
 	// resource meta is updated, update kv and cache.
-	if rangeChanged || peersChanged {
+	if current.meta.Changed(source.meta) {
 		return rc.doPutResource(source)
 	}
 

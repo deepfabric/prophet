@@ -1,2 +1,2 @@
-# lion
+# prophet
 Embedded distributed coordinator

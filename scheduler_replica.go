@@ -5,12 +5,14 @@ import (
 )
 
 type replicaChecker struct {
+	cfg     *Cfg
 	rt      *Runtime
 	filters []Filter
 }
 
-func newReplicaChecker(rt *Runtime, filters ...Filter) *replicaChecker {
+func newReplicaChecker(cfg *Cfg, rt *Runtime, filters ...Filter) *replicaChecker {
 	return &replicaChecker{
+		cfg:     cfg,
 		rt:      rt,
 		filters: filters,
 	}
@@ -26,16 +28,16 @@ func (r *replicaChecker) Check(target *ResourceRuntime) Operator {
 	}
 
 	currReplicasCount := len(target.meta.Peers())
-	if currReplicasCount < cfg.CountResourceReplicas {
+	if currReplicasCount < r.cfg.CountResourceReplicas {
 		newPeer, _ := r.selectBestPeer(target, true, r.filters...)
 		if newPeer == nil {
 			return nil
 		}
 
-		return newAddPeerAggregationOp(target, newPeer)
+		return newAddPeerAggregationOp(r.cfg, target, newPeer)
 	}
 
-	if currReplicasCount > cfg.CountResourceReplicas {
+	if currReplicasCount > r.cfg.CountResourceReplicas {
 		oldPeer, _ := r.selectWorstPeer(target)
 		if oldPeer == nil {
 			return nil
@@ -52,11 +54,11 @@ func (r *replicaChecker) checkDownPeer(target *ResourceRuntime) Operator {
 		peer := stats.Peer
 		container := r.rt.GetContainer(peer.ContainerID)
 
-		if nil != container && container.Downtime() < cfg.MaxAllowContainerDownDuration {
+		if nil != container && container.Downtime() < r.cfg.MaxAllowContainerDownDuration {
 			continue
 		}
 
-		if nil != container && stats.DownSeconds < uint64(cfg.MaxAllowContainerDownDuration.Seconds()) {
+		if nil != container && stats.DownSeconds < uint64(r.cfg.MaxAllowContainerDownDuration.Seconds()) {
 			continue
 		}
 
@@ -79,7 +81,7 @@ func (r *replicaChecker) checkOfflinePeer(target *ResourceRuntime) Operator {
 			return nil
 		}
 
-		return newTransferPeerAggregationOp(target, peer, newPeer)
+		return newTransferPeerAggregationOp(r.cfg, target, peer, newPeer)
 	}
 
 	return nil
@@ -99,7 +101,7 @@ func (r *replicaChecker) selectWorstPeer(target *ResourceRuntime, filters ...Fil
 		if filterSource(container, filters) {
 			continue
 		}
-		score := cfg.getDistinctScore(containers, container)
+		score := r.cfg.getDistinctScore(containers, container)
 		if worstContainer == nil || compareContainerScore(container, score, worstContainer, worstScore) < 0 {
 			worstContainer = container
 			worstScore = score
@@ -116,8 +118,8 @@ func (r *replicaChecker) selectWorstPeer(target *ResourceRuntime, filters ...Fil
 // selectBestPeer returns the best peer in other containers.
 func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID bool, filters ...Filter) (*Peer, float64) {
 	// Add some must have filters.
-	filters = append(filters, NewStateFilter())
-	filters = append(filters, NewStorageThresholdFilter())
+	filters = append(filters, NewStateFilter(r.cfg))
+	filters = append(filters, NewStorageThresholdFilter(r.cfg))
 	filters = append(filters, NewExcludedFilter(nil, target.GetContainerIDs()))
 
 	var (
@@ -133,7 +135,7 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 			continue
 		}
 
-		score := getDistinctScore(containers, container)
+		score := getDistinctScore(r.cfg, containers, container)
 		if bestContainer == nil || compareContainerScore(container, score, bestContainer, bestScore) > 0 {
 			bestContainer = container
 			bestScore = score
@@ -175,7 +177,7 @@ func (r *replicaChecker) checkBestReplacement(target *ResourceRuntime) Operator 
 	}
 
 	newPeer.ID = id
-	return newTransferPeerAggregationOp(target, oldPeer, newPeer)
+	return newTransferPeerAggregationOp(r.cfg, target, oldPeer, newPeer)
 }
 
 // selectBestReplacement returns the best peer to replace the resource peer.
@@ -190,7 +192,7 @@ func (r *replicaChecker) selectBestReplacement(target *ResourceRuntime, peer *Pe
 
 // getDistinctScore returns the score that the other is distinct from the containers.
 // A higher score means the other container is more different from the existed containers.
-func getDistinctScore(containers []*ContainerRuntime, other *ContainerRuntime) float64 {
+func getDistinctScore(cfg *Cfg, containers []*ContainerRuntime, other *ContainerRuntime) float64 {
 	score := float64(0)
 	locationLabels := cfg.getLocationLabels()
 

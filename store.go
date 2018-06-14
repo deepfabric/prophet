@@ -4,9 +4,9 @@ package prophet
 type Store interface {
 	// CampaignLeader is for leader election
 	// if we are win the leader election, the enableLeaderFun will call
-	CampaignLeader(signature string, ttl int64, enableLeaderFun, disableLeaderFun func()) error
+	CampaignLeader(ttl int64, enableLeaderFun, disableLeaderFun func()) error
 	// ResignLeader delete leader itself and let others start a new election again.
-	ResignLeader(signature string) error
+	ResignLeader() error
 	// GetCurrentLeader return current leader
 	GetCurrentLeader() (*Node, error)
 	// WatchLeader watch leader,
@@ -18,6 +18,8 @@ type Store interface {
 	PutResource(meta Resource) error
 	// PutContainer puts the meta to the store
 	PutContainer(meta Container) error
+	// GetContainer returns the spec container
+	GetContainer(id uint64) (Container, error)
 	// LoadResources load all resources
 	LoadResources(limit int64, do func(Resource)) error
 	// LoadContainers load all containers
@@ -25,4 +27,7 @@ type Store interface {
 
 	// AllocID returns the alloc id
 	AllocID() (uint64, error)
+
+	// PutBootstrapped put cluster is bootstrapped
+	PutBootstrapped(container Container, res Resource) (bool, error)
 }

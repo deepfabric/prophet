@@ -24,8 +24,12 @@ const (
 
 // Serializable serializable
 type Serializable interface {
-	Marshal() ([]byte, error)
-	Unmarshal(data []byte) error
+}
+
+type codecSerializable interface {
+	Serializable
+	Prepare() error
+	Init(adapter Adapter) error
 }
 
 // Peer is the resource peer
@@ -63,11 +67,12 @@ type Resource interface {
 	ID() uint64
 	Peers() []*Peer
 	SetPeers(peers []*Peer)
-	IsStale(other Resource) bool
-	PeerChanged(other Resource) bool
-	RangeChanged(other Resource) bool
-
+	Stale(other Resource) bool
+	Changed(other Resource) bool
 	Clone() Resource
+
+	Marshal() ([]byte, error)
+	Unmarshal(data []byte) error
 }
 
 // Pair key value pair
@@ -85,4 +90,7 @@ type Container interface {
 	State() State
 
 	Clone() Container
+
+	Marshal() ([]byte, error)
+	Unmarshal(data []byte) error
 }

@@ -69,7 +69,7 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 	return cfg, nil
 }
 
-func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) (uint64, *clientv3.Client) {
+func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	log.Info("prophet: start embed etcd")
 	cfg, err := ecfg.getEmbedEtcdConfig()
 	if err != nil {
@@ -91,10 +91,10 @@ func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) (uint64, *clientv3.Client) {
 		log.Fatalf("prophet: start embed etcd timeout")
 	}
 
-	return 0, nil
+	return nil
 }
 
-func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg) (uint64, *clientv3.Client) {
+func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	checkEtcdCluster(etcd, ecfg)
 
 	id := uint64(etcd.Server.ID())
@@ -118,7 +118,7 @@ func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *Embe
 		log.Fatalf("prophet: etcd start failure, errors:\n%+v", err)
 	}
 
-	return id, client
+	return client
 }
 
 func initEtcdClient(cfg *embed.Config) (*clientv3.Client, error) {

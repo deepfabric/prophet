@@ -6,12 +6,16 @@ import (
 )
 
 var (
-	cfg *Cfg
-
 	replicaBaseScore = float64(100)
 )
 
-// Cfg lion cfg
+type emprtyHandler struct {
+}
+
+func (h *emprtyHandler) BecomeLeader()   {}
+func (h *emprtyHandler) BecomeFollower() {}
+
+// Cfg prophet cfg
 type Cfg struct {
 	// MaxScheduleRetries maximum retry times for schedule
 	MaxScheduleRetries int
@@ -39,13 +43,28 @@ type Cfg struct {
 	MinAvailableStorageUsedRate int
 	// LocationLabels the label used for location
 	LocationLabels []string
+	// MaxRPCCons rpc conns
+	MaxRPCCons int
+	// MaxRPCConnIdle rpc conn max idle time
+	MaxRPCConnIdle time.Duration
+	// MaxRPCTimeout rpc max timeout
+	MaxRPCTimeout time.Duration
 
-	schedulers       []Scheduler
-	resourceFactory  func() Resource
-	containerFactory func() Container
+	Namespace  string
+	LeaseTTL   int64
+	Schedulers []Scheduler
+	Handler    RoleChangeHandler
 }
 
 func (c *Cfg) adujst() {
+	if c.LeaseTTL == 0 {
+		c.LeaseTTL = 5
+	}
+
+	if c.Namespace == "" {
+		c.Namespace = "/prophet"
+	}
+
 	if c.MaxScheduleRetries == 0 {
 		c.MaxScheduleRetries = 3
 	}
@@ -94,9 +113,25 @@ func (c *Cfg) adujst() {
 		c.MaxLimitSnapshotsCount = 3
 	}
 
-	if c.schedulers == nil {
-		c.schedulers = append(c.schedulers, newBalanceReplicaScheduler())
-		c.schedulers = append(c.schedulers, newBalanceResourceLeaderScheduler())
+	if c.MaxRPCCons == 0 {
+		c.MaxRPCCons = 10
+	}
+
+	if c.MaxRPCConnIdle == 0 {
+		c.MaxRPCConnIdle = time.Hour
+	}
+
+	if c.MaxRPCTimeout == 0 {
+		c.MaxRPCTimeout = time.Second * 10
+	}
+
+	if len(c.Schedulers) == 0 {
+		c.Schedulers = append(c.Schedulers, newBalanceReplicaScheduler(c))
+		c.Schedulers = append(c.Schedulers, newBalanceResourceLeaderScheduler(c))
+	}
+
+	if c.Handler == nil {
+		c.Handler = &emprtyHandler{}
 	}
 }
 

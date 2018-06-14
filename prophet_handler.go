@@ -51,7 +51,12 @@ func (p *Prophet) handleContainerHeartbeat(msg *ContainerHeartbeatReq) error {
 
 	container := p.rt.GetContainer(meta.ID())
 	if container == nil {
-		return fmt.Errorf("container %d not found", meta.ID())
+		err := p.store.PutContainer(meta)
+		if err != nil {
+			return err
+		}
+
+		container = newContainerRuntime(meta)
 	}
 
 	container.busy = msg.Busy
@@ -66,4 +71,44 @@ func (p *Prophet) handleContainerHeartbeat(msg *ContainerHeartbeatReq) error {
 
 	p.rt.handleContainer(container)
 	return nil
+}
+
+func (p *Prophet) handleAllocID(req *allocIDReq) *allocIDRsp {
+	id, err := p.store.AllocID()
+	return &allocIDRsp{
+		ID:  id,
+		Err: err,
+	}
+}
+
+func (p *Prophet) handleAskSplit(req *askSplitReq) *askSplitRsp {
+	p.Lock()
+	defer p.Unlock()
+
+	rsp := &askSplitRsp{}
+
+	res := p.rt.GetResource(req.Resource.ID())
+	if res == nil {
+		rsp.Err = fmt.Errorf("resource not found")
+		return rsp
+	}
+
+	newID, err := p.store.AllocID()
+	if err != nil {
+		rsp.Err = err
+		return rsp
+	}
+
+	cnt := len(req.Resource.Peers())
+	peerIDs := make([]uint64, cnt)
+	for index := 0; index < cnt; index++ {
+		if peerIDs[index], err = p.store.AllocID(); err != nil {
+			rsp.Err = err
+			return rsp
+		}
+	}
+
+	rsp.NewID = newID
+	rsp.NewPeerIDs = peerIDs
+	return rsp
 }

@@ -13,7 +13,6 @@ var (
 
 // Node is prophet info
 type Node struct {
-	ID   uint64 `json:"id"`
 	Name string `json:"name"`
 	Addr string `json:"addr"`
 }
@@ -45,7 +44,7 @@ func (p *Prophet) startLeaderLoop() {
 						// in previous campaignLeader. we can resign and campaign again.
 						log.Warnf("prophet: leader is matched, resign and campaign again, leader is <%v>",
 							leader)
-						if err = p.store.ResignLeader(p.signature); err != nil {
+						if err = p.store.ResignLeader(); err != nil {
 							log.Warnf("prophet: resign leader failure, leader <%v>, errors:\n %+v",
 								leader,
 								err)
@@ -57,6 +56,7 @@ func (p *Prophet) startLeaderLoop() {
 							leader)
 						p.leader = leader // reset leader node for forward
 						p.notifyElectionComplete()
+						p.cfg.Handler.BecomeFollower()
 						p.store.WatchLeader()
 						log.Infof("prophet: leader changed, try to campaign leader <%v>", leader)
 					}
@@ -64,14 +64,13 @@ func (p *Prophet) startLeaderLoop() {
 
 				log.Debugf("prophet: begin to campaign leader %s",
 					p.node.Name)
-				if err = p.store.CampaignLeader(p.signature, p.opts.leaseTTL, p.enableLeader, p.disableLeader); err != nil {
+				if err = p.store.CampaignLeader(p.cfg.LeaseTTL, p.enableLeader, p.disableLeader); err != nil {
 					log.Errorf("prophet: campaign leader failure, errors:\n %+v", err)
 				}
 			}
 		}
 	})
 	<-p.completeC
-
 }
 
 func (p *Prophet) enableLeader() {
@@ -81,18 +80,25 @@ func (p *Prophet) enableLeader() {
 
 	p.rt = newRuntime(p.store)
 	p.rt.load()
-
+	p.coordinator = newCoordinator(p.cfg, p.runner, p.rt)
+	p.coordinator.start()
 	p.notifyElectionComplete()
+	p.cfg.Handler.BecomeLeader()
 }
 
 func (p *Prophet) disableLeader() {
+	log.Infof("prophet: ********become to follower now********")
 	// now, we are not leader
 	atomic.StoreInt64(&p.leaderFlag, 0)
-	log.Infof("prophet: ********become to follower now********")
+	if p.coordinator != nil {
+		p.coordinator.stop()
+		p.rt = nil
+	}
+	p.cfg.Handler.BecomeFollower()
 }
 
 func (p *Prophet) isLeader() bool {
-	return 0 == atomic.LoadInt64(&p.leaderFlag)
+	return 1 == atomic.LoadInt64(&p.leaderFlag)
 }
 
 func (p *Prophet) notifyElectionComplete() {
@@ -103,6 +109,5 @@ func (p *Prophet) notifyElectionComplete() {
 
 func (p *Prophet) isMatchLeader(leaderNode *Node) bool {
 	return leaderNode != nil &&
-		p.node.Name == leaderNode.Name &&
-		p.node.ID == leaderNode.ID
+		p.node.Name == leaderNode.Name
 }

@@ -4,20 +4,22 @@ type balanceReplicaScheduler struct {
 	limit       uint64
 	freezeCache *resourceFreezeCache
 	selector    Selector
+	cfg         *Cfg
 }
 
-func newBalanceReplicaScheduler() Scheduler {
+func newBalanceReplicaScheduler(cfg *Cfg) Scheduler {
 	freezeCache := newResourceFreezeCache(cfg.MaxFreezeScheduleInterval, 4*cfg.MaxFreezeScheduleInterval)
 
 	var filters []Filter
 	filters = append(filters, NewCacheFilter(freezeCache))
-	filters = append(filters, NewStateFilter())
-	filters = append(filters, NewHealthFilter())
-	filters = append(filters, NewStorageThresholdFilter())
-	filters = append(filters, NewSnapshotCountFilter())
+	filters = append(filters, NewStateFilter(cfg))
+	filters = append(filters, NewHealthFilter(cfg))
+	filters = append(filters, NewStorageThresholdFilter(cfg))
+	filters = append(filters, NewSnapshotCountFilter(cfg))
 
 	freezeCache.startGC()
 	return &balanceReplicaScheduler{
+		cfg:         cfg,
 		freezeCache: freezeCache,
 		limit:       1,
 		selector:    newBalanceSelector(ReplicaKind, filters),
@@ -33,7 +35,7 @@ func (s *balanceReplicaScheduler) ResourceKind() ResourceKind {
 }
 
 func (s *balanceReplicaScheduler) ResourceLimit() uint64 {
-	return minUint64(s.limit, cfg.MaxRebalanceReplica)
+	return minUint64(s.limit, s.cfg.MaxRebalanceReplica)
 }
 
 func (s *balanceReplicaScheduler) Prepare(rt *Runtime) error { return nil }
@@ -48,7 +50,7 @@ func (s *balanceReplicaScheduler) Schedule(rt *Runtime) Operator {
 	}
 
 	// We don't schedule resource with abnormal number of replicas.
-	if len(res.meta.Peers()) != int(cfg.CountResourceReplicas) {
+	if len(res.meta.Peers()) != int(s.cfg.CountResourceReplicas) {
 		return nil
 	}
 
@@ -66,9 +68,9 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 	// scoreGuard guarantees that the distinct score will not decrease.
 	containers := rt.GetResourceContainers(res)
 	source := rt.GetContainer(oldPeer.ContainerID)
-	scoreGuard := NewDistinctScoreFilter(containers, source)
+	scoreGuard := NewDistinctScoreFilter(s.cfg, containers, source)
 
-	checker := newReplicaChecker(rt)
+	checker := newReplicaChecker(s.cfg, rt)
 	newPeer, _ := checker.selectBestPeer(res, true, scoreGuard)
 	if newPeer == nil {
 		return nil
@@ -80,7 +82,7 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 	}
 
 	s.limit = adjustBalanceLimit(rt, s.ResourceKind())
-	return newTransferPeerAggregationOp(res, oldPeer, newPeer)
+	return newTransferPeerAggregationOp(s.cfg, res, oldPeer, newPeer)
 }
 
 // scheduleRemovePeer schedules a resource to remove the peer.

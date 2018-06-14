@@ -20,7 +20,9 @@ func newResourceRuntime(meta Resource, leader *Peer) *ResourceRuntime {
 func (res *ResourceRuntime) Clone() *ResourceRuntime {
 	value := &ResourceRuntime{}
 	value.meta = res.meta.Clone()
-	value.leaderPeer = res.leaderPeer.Clone()
+	if res.leaderPeer != nil {
+		value.leaderPeer = res.leaderPeer.Clone()
+	}
 	value.downPeers = make([]*PeerStats, len(res.downPeers))
 	for idx, ps := range res.downPeers {
 		value.downPeers[idx] = ps.Clone()

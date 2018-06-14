@@ -7,7 +7,6 @@ import (
 
 // Scheduler is an interface to schedule resources.
 type Scheduler interface {
-	// Name returns scheduler's name
 	Name() string
 	ResourceKind() ResourceKind
 	ResourceLimit() uint64
@@ -55,8 +54,9 @@ func (l *scheduleLimiter) operatorCount(kind ResourceKind) uint64 {
 
 type scheduleController struct {
 	sync.Mutex
-
 	Scheduler
+
+	cfg      *Cfg
 	limiter  *scheduleLimiter
 	interval time.Duration
 }
@@ -64,20 +64,21 @@ type scheduleController struct {
 func newScheduleController(c *Coordinator, s Scheduler) *scheduleController {
 	return &scheduleController{
 		Scheduler: s,
+		cfg:       c.cfg,
 		limiter:   c.limiter,
-		interval:  cfg.MinScheduleInterval,
+		interval:  c.cfg.MinScheduleInterval,
 	}
 }
 
 func (s *scheduleController) Schedule(rt *Runtime) Operator {
 	// If we have schedule, reset interval to the minimal interval.
 	if op := s.Scheduler.Schedule(rt); op != nil {
-		s.interval = cfg.MinScheduleInterval
+		s.interval = s.cfg.MinScheduleInterval
 		return op
 	}
 
 	// If we have no schedule, increase the interval exponentially.
-	s.interval = minDuration(s.interval*2, cfg.MaxScheduleInterval)
+	s.interval = minDuration(s.interval*2, s.cfg.MaxScheduleInterval)
 	return nil
 }
 

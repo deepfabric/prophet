@@ -57,9 +57,11 @@ func (rc *Runtime) GetContainers() []*ContainerRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
-	value := make([]*ContainerRuntime, len(rc.containers))
-	for idx, cr := range rc.containers {
+	value := make([]*ContainerRuntime, len(rc.containers), len(rc.containers))
+	idx := 0
+	for _, cr := range rc.containers {
 		value[idx] = cr.Clone()
+		idx++
 	}
 
 	return value

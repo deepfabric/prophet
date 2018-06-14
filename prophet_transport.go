@@ -8,64 +8,86 @@ import (
 	"github.com/fagongzi/goetty"
 )
 
-var (
-	bizCodec = &codec{}
-)
-
 const (
 	typeResourceHeartbeatReq byte = iota
 	typeResourceHeartbeatRsp
 	typeContainerHeartbeatReq
 	typeContainerHeartbeatRsp
+	typeGetContainerReq
+	typeGetContainerRsp
+	typeAllocIDReq
+	typeAllocIDRsp
+	typeAskSplitReq
+	typeAskSplitRsp
+	typeReportSplitReq
+	typeReportSplitRsp
 	typeErrorRsp
 )
 
-type codecMsg struct{}
-
-func (msg *codecMsg) Marshal() ([]byte, error) {
-	return json.Marshal(msg)
-}
-
-func (msg *codecMsg) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, msg)
-}
-
 // ResourceHeartbeatReq resource hb msg
 type ResourceHeartbeatReq struct {
-	codecMsg
-	Resource     Resource     `json:"resource"`
+	Resource     Resource     `json:"-"`
+	Data         []byte       `json:"data"`
 	LeaderPeer   *Peer        `json:"leaderPeer"`
 	DownPeers    []*PeerStats `json:"downPeers"`
 	PendingPeers []*Peer      `json:"pendingPeers"`
 }
 
-type resourceHeartbeatRsp struct {
-	codecMsg
-	ResourceID      uint64         `json:"resourceID"`
-	NewLeaderPeerID uint64         `json:"newLeaderPeerID"`
-	TargetPeerID    uint64         `json:"targetPeerID"`
-	ChangeType      ChangePeerType `json:"changeType"`
+// Init init
+func (req *ResourceHeartbeatReq) Init(adapter Adapter) error {
+	req.Resource = adapter.NewResource()
+	err := req.Resource.Unmarshal(req.Data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func newChangeLeaderRsp(resourceID uint64, newLeaderPeerID uint64) *resourceHeartbeatRsp {
+// Prepare prepare
+func (req *ResourceHeartbeatReq) Prepare() error {
+	data, err := req.Resource.Marshal()
+	if err != nil {
+		return err
+	}
+
+	req.Data = data
+	return nil
+}
+
+type resourceHeartbeatRsp struct {
+	ResourceID uint64         `json:"resourceID"`
+	NewLeader  *Peer          `json:"newLeader"`
+	Peer       *Peer          `json:"peer"`
+	ChangeType ChangePeerType `json:"changeType"`
+}
+
+type getContainerReq struct {
+	ID uint64 `json:"id"`
+}
+
+type getContainerRsp struct {
+	Container Container `json:"container"`
+}
+
+func newChangeLeaderRsp(resourceID uint64, newLeader *Peer) *resourceHeartbeatRsp {
 	return &resourceHeartbeatRsp{
-		ResourceID:      resourceID,
-		NewLeaderPeerID: newLeaderPeerID,
+		ResourceID: resourceID,
+		NewLeader:  newLeader,
 	}
 }
 
-func newChangePeerRsp(resourceID uint64, targetPeerID uint64, changeType ChangePeerType) *resourceHeartbeatRsp {
+func newChangePeerRsp(resourceID uint64, peer *Peer, changeType ChangePeerType) *resourceHeartbeatRsp {
 	return &resourceHeartbeatRsp{
-		ResourceID:   resourceID,
-		TargetPeerID: targetPeerID,
-		ChangeType:   changeType,
+		ResourceID: resourceID,
+		Peer:       peer,
+		ChangeType: changeType,
 	}
 }
 
 // ContainerHeartbeatReq container hb msg
 type ContainerHeartbeatReq struct {
-	codecMsg
-	Container          Container `json:"container"`
+	Data               []byte    `json:"data"`
 	StorageCapacity    uint64    `json:"storageCapacity"`
 	StorageAvailable   uint64    `json:"storageAvailable"`
 	LeaderCount        uint64    `json:"leaderCount"`
@@ -74,34 +96,103 @@ type ContainerHeartbeatReq struct {
 	ReceivingSnapCount uint64    `json:"receivingSnapCount"`
 	ApplyingSnapCount  uint64    `json:"applyingSnapCount"`
 	Busy               bool      `json:"busy"`
+	Container          Container `json:"-"`
+}
+
+// Init init
+func (req *ContainerHeartbeatReq) Init(adapter Adapter) error {
+	req.Container = adapter.NewContainer()
+	err := req.Container.Unmarshal(req.Data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Prepare prepare
+func (req *ContainerHeartbeatReq) Prepare() error {
+	data, err := req.Container.Marshal()
+	if err != nil {
+		return err
+	}
+
+	req.Data = data
+	return nil
 }
 
 type containerHeartbeatRsp struct {
-	codecMsg
-	status string `json:"status"`
+	Status string `json:"status"`
 }
 
 func newContainerHeartbeatRsp() Serializable {
 	rsp := &containerHeartbeatRsp{}
-	rsp.status = "OK"
+	rsp.Status = "OK"
 
 	return rsp
 }
 
 type errorRsp struct {
-	codecMsg
-	err error `json:"err"`
+	Err error `json:"err"`
 }
 
 func newErrorRsp(err error) Serializable {
 	rsp := &errorRsp{}
-	rsp.err = err
+	rsp.Err = err
 
 	return rsp
 }
 
+type allocIDReq struct {
+}
+
+type allocIDRsp struct {
+	ID  uint64 `json:"id,omitempty"`
+	Err error  `json:"err,omitempty"`
+}
+
+type askSplitReq struct {
+	Resource Resource `json:"-"`
+	Data     []byte   `json:"data,omitempty"`
+}
+
+// Init init
+func (req *askSplitReq) Init(adapter Adapter) error {
+	if len(req.Data) > 0 {
+		req.Resource = adapter.NewResource()
+		err := req.Resource.Unmarshal(req.Data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Prepare prepare
+func (req *askSplitReq) Prepare() error {
+	if req.Resource != nil {
+		data, err := req.Resource.Marshal()
+		if err != nil {
+			return err
+		}
+
+		req.Data = data
+	}
+
+	return nil
+}
+
+type askSplitRsp struct {
+	Err        error    `json:"err,omitempty"`
+	NewID      uint64   `json:"newID,omitempty"`
+	NewPeerIDs []uint64 `json:"peerIDs,omitempty"`
+}
+
 // codec format: length(4bytes) + msgType(1bytes) + msg(length bytes)
-type codec struct{}
+type codec struct {
+	adapter Adapter
+}
 
 func (c *codec) Encode(data interface{}, out *goetty.ByteBuf) error {
 	var target Serializable
@@ -119,6 +210,18 @@ func (c *codec) Encode(data interface{}, out *goetty.ByteBuf) error {
 	} else if msg, ok := data.(*containerHeartbeatRsp); ok {
 		target = msg
 		t = typeContainerHeartbeatRsp
+	} else if msg, ok := data.(*allocIDReq); ok {
+		target = msg
+		t = typeAllocIDReq
+	} else if msg, ok := data.(*allocIDRsp); ok {
+		target = msg
+		t = typeAllocIDRsp
+	} else if msg, ok := data.(*askSplitReq); ok {
+		target = msg
+		t = typeAskSplitReq
+	} else if msg, ok := data.(*askSplitRsp); ok {
+		target = msg
+		t = typeAskSplitRsp
 	} else if msg, ok := data.(*errorRsp); ok {
 		target = msg
 		t = typeErrorRsp
@@ -126,7 +229,14 @@ func (c *codec) Encode(data interface{}, out *goetty.ByteBuf) error {
 		return fmt.Errorf("not support msg: %+v", data)
 	}
 
-	value, err := target.Marshal()
+	if codecS, ok := target.(codecSerializable); ok {
+		err := codecS.Prepare()
+		if err != nil {
+			return err
+		}
+	}
+
+	value, err := json.Marshal(target)
 	if err != nil {
 		return err
 	}
@@ -156,6 +266,18 @@ func (c *codec) Decode(in *goetty.ByteBuf) (bool, interface{}, error) {
 	case typeContainerHeartbeatRsp:
 		msg = &containerHeartbeatRsp{}
 		break
+	case typeAllocIDReq:
+		msg = &allocIDReq{}
+		break
+	case typeAllocIDRsp:
+		msg = &allocIDRsp{}
+		break
+	case typeAskSplitReq:
+		msg = &askSplitReq{}
+		break
+	case typeAskSplitRsp:
+		msg = &askSplitRsp{}
+		break
 	case typeErrorRsp:
 		msg = &errorRsp{}
 		break
@@ -163,9 +285,16 @@ func (c *codec) Decode(in *goetty.ByteBuf) (bool, interface{}, error) {
 		return false, nil, fmt.Errorf("unknown msg type")
 	}
 
-	err := msg.Unmarshal(value[1:])
+	err := json.Unmarshal(value[1:], msg)
 	if err != nil {
 		return false, nil, err
+	}
+
+	if codecS, ok := msg.(codecSerializable); ok {
+		err = codecS.Init(c.adapter)
+		if err != nil {
+			return false, nil, err
+		}
 	}
 
 	return true, msg, nil
@@ -175,13 +304,14 @@ func (p *Prophet) startListen() {
 	go func() {
 		err := p.tcpL.Start(p.doConnection)
 		if err != nil {
-			log.Fatalf("prophet: listen at %s failure, errors:\n%+v",
+			log.Fatalf("prophet: rpc listen at %s failed, errors:\n%+v",
 				p.node.Addr,
 				err)
 		}
 	}()
 
 	<-p.tcpL.Started()
+	log.Infof("prophet: start rpc listen at %s", p.node.Addr)
 }
 
 func (p *Prophet) doConnection(conn goetty.IOSession) error {
@@ -206,13 +336,15 @@ func (p *Prophet) doConnection(conn goetty.IOSession) error {
 		} else if msg, ok := value.(*ContainerHeartbeatReq); ok {
 			p.handleContainerHeartbeat(msg)
 			conn.WriteAndFlush(newContainerHeartbeatRsp())
+		} else if msg, ok := value.(*allocIDReq); ok {
+			conn.WriteAndFlush(p.handleAllocID(msg))
+		} else if msg, ok := value.(*askSplitReq); ok {
+			conn.WriteAndFlush(p.handleAskSplit(msg))
 		}
 	}
 }
 
 func (p *Prophet) getLeaderClient() goetty.IOSession {
-	var conn goetty.IOSession
-	var err error
 	for {
 		l := p.leader
 		addr := p.node.Addr
@@ -220,22 +352,20 @@ func (p *Prophet) getLeaderClient() goetty.IOSession {
 			addr = l.Addr
 		}
 
-		conn, err = p.createLeaderClient(addr)
+		conn, err := p.createLeaderClient(addr)
 		if err == nil {
-			log.Errorf("prophet: create leader connection failed, errors: %+v", err)
-			break
+			return conn
 		}
 
+		log.Errorf("prophet: create leader connection failed, errors: %+v", err)
 		time.Sleep(time.Second)
 	}
-
-	return conn
 }
 
 func (p *Prophet) createLeaderClient(leader string) (goetty.IOSession, error) {
 	conn := goetty.NewConnector(leader,
-		goetty.WithClientDecoder(goetty.NewIntLengthFieldBasedDecoder(bizCodec)),
-		goetty.WithClientEncoder(goetty.NewIntLengthFieldBasedEncoder(bizCodec)),
+		goetty.WithClientDecoder(goetty.NewIntLengthFieldBasedDecoder(p.bizCodec)),
+		goetty.WithClientEncoder(goetty.NewIntLengthFieldBasedEncoder(p.bizCodec)),
 		goetty.WithClientConnectTimeout(time.Second*10))
 	_, err := conn.Connect()
 	if err != nil {
