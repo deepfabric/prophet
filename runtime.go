@@ -12,7 +12,7 @@ const (
 type Runtime struct {
 	sync.RWMutex
 
-	store      Store
+	p          *Prophet
 	containers map[uint64]*ContainerRuntime
 	resources  map[uint64]*ResourceRuntime
 
@@ -20,9 +20,9 @@ type Runtime struct {
 	followers map[uint64]map[uint64]*ResourceRuntime // container -> resource -> ResourceRuntime
 }
 
-func newRuntime(store Store) *Runtime {
+func newRuntime(p *Prophet) *Runtime {
 	return &Runtime{
-		store:      store,
+		p:          p,
 		containers: make(map[uint64]*ContainerRuntime),
 		resources:  make(map[uint64]*ResourceRuntime),
 		leaders:    make(map[uint64]map[uint64]*ResourceRuntime),
@@ -31,7 +31,7 @@ func newRuntime(store Store) *Runtime {
 }
 
 func (rc *Runtime) load() {
-	err := rc.store.LoadResources(batchLimit, func(meta Resource) {
+	err := rc.p.store.LoadResources(batchLimit, func(meta Resource) {
 		rc.Lock()
 		defer rc.Unlock()
 
@@ -41,7 +41,7 @@ func (rc *Runtime) load() {
 		log.Fatalf("prophet: load resources failed, errors:%+v", err)
 	}
 
-	err = rc.store.LoadContainers(batchLimit, func(meta Container) {
+	err = rc.p.store.LoadContainers(batchLimit, func(meta Container) {
 		rc.Lock()
 		defer rc.Unlock()
 
@@ -60,6 +60,21 @@ func (rc *Runtime) GetContainers() []*ContainerRuntime {
 	value := make([]*ContainerRuntime, len(rc.containers), len(rc.containers))
 	idx := 0
 	for _, cr := range rc.containers {
+		value[idx] = cr.Clone()
+		idx++
+	}
+
+	return value
+}
+
+// GetResources returns the resources, using clone
+func (rc *Runtime) GetResources() []*ResourceRuntime {
+	rc.RLock()
+	defer rc.RUnlock()
+
+	value := make([]*ResourceRuntime, len(rc.resources), len(rc.resources))
+	idx := 0
+	for _, cr := range rc.resources {
 		value[idx] = cr.Clone()
 		idx++
 	}

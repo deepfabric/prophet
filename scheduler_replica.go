@@ -146,7 +146,7 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 		return nil, 0
 	}
 
-	newPeer, err := allocPeer(bestContainer.meta.ID(), r.rt.store)
+	newPeer, err := allocPeer(bestContainer.meta.ID(), r.rt.p.store)
 	if err != nil {
 		log.Errorf("scheduler: allocate peer failure, errors:\n %+v", err)
 		return nil, 0
@@ -170,7 +170,7 @@ func (r *replicaChecker) checkBestReplacement(target *ResourceRuntime) Operator 
 		return nil
 	}
 
-	id, err := r.rt.store.AllocID()
+	id, err := r.rt.p.store.AllocID()
 	if err != nil {
 		log.Errorf("prophet: allocate peer failure, %+v", err)
 		return nil
