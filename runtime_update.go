@@ -18,6 +18,9 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 			return err
 		}
 		rc.p.notifyEvent(newResourceEvent(EventResourceCreated, source.meta))
+		if source.leaderPeer != nil {
+			rc.p.notifyEvent(newLeaderChangerEvent(source.meta.ID(), source.leaderPeer.ID))
+		}
 		return nil
 	}
 
