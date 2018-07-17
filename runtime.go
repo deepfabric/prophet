@@ -52,8 +52,8 @@ func (rc *Runtime) load() {
 	}
 }
 
-// GetContainers returns the containers, using clone
-func (rc *Runtime) GetContainers() []*ContainerRuntime {
+// Containers returns the containers, using clone
+func (rc *Runtime) Containers() []*ContainerRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
@@ -67,8 +67,8 @@ func (rc *Runtime) GetContainers() []*ContainerRuntime {
 	return value
 }
 
-// GetResources returns the resources, using clone
-func (rc *Runtime) GetResources() []*ResourceRuntime {
+// Resources returns the resources, using clone
+func (rc *Runtime) Resources() []*ResourceRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
@@ -82,24 +82,24 @@ func (rc *Runtime) GetResources() []*ResourceRuntime {
 	return value
 }
 
-// GetContainer returns a cloned value of container runtime info
-func (rc *Runtime) GetContainer(id uint64) *ContainerRuntime {
+// Container returns a cloned value of container runtime info
+func (rc *Runtime) Container(id uint64) *ContainerRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
 	return rc.getContainerWithoutLock(id)
 }
 
-// GetResource returns a cloned value of resource runtime info
-func (rc *Runtime) GetResource(id uint64) *ResourceRuntime {
+// Resource returns a cloned value of resource runtime info
+func (rc *Runtime) Resource(id uint64) *ResourceRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
 	return rc.getResourceWithoutLock(id)
 }
 
-// GetResourceContainers returns resource containers
-func (rc *Runtime) GetResourceContainers(target *ResourceRuntime) []*ContainerRuntime {
+// ResourceContainers returns containers that has the resource's peer
+func (rc *Runtime) ResourceContainers(target *ResourceRuntime) []*ContainerRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 
@@ -112,8 +112,8 @@ func (rc *Runtime) GetResourceContainers(target *ResourceRuntime) []*ContainerRu
 	return containers
 }
 
-// GetResourceFollowerContainers returns all containers for peers exclude leader
-func (rc *Runtime) GetResourceFollowerContainers(res *ResourceRuntime) []*ContainerRuntime {
+// ResourceFollowerContainers returns all containers for peers exclude leader
+func (rc *Runtime) ResourceFollowerContainers(res *ResourceRuntime) []*ContainerRuntime {
 	rc.RLock()
 	defer rc.RUnlock()
 

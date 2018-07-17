@@ -33,7 +33,6 @@ func (w *Watcher) Watch(flag int) chan *EventNotify {
 	w.Lock()
 	defer w.Unlock()
 
-	flag = flag | EventInit
 	go w.watchDog(flag)
 	w.eventC = make(chan *EventNotify)
 	return w.eventC

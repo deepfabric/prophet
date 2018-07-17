@@ -53,11 +53,26 @@ type EventNotify struct {
 func newInitEvent(rt *Runtime) (*EventNotify, error) {
 	value := goetty.NewByteBuf(512)
 
-	resources := rt.GetResources()
-	value.WriteInt(len(resources))
+	snap := rt.snap()
+	value.WriteInt(len(snap.resources))
+	value.WriteInt(len(snap.containers))
 
-	for _, v := range resources {
-		data, err := v.meta.Marshal()
+	for _, v := range snap.resources {
+		data, err := v.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		value.WriteInt(len(data) + 8)
+		value.Write(data)
+		if id, ok := snap.leaders[v.ID()]; ok {
+			value.WriteUint64(id)
+		} else {
+			value.WriteUint64(0)
+		}
+	}
+
+	for _, v := range snap.containers {
+		data, err := v.Marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -65,9 +80,10 @@ func newInitEvent(rt *Runtime) (*EventNotify, error) {
 		value.Write(data)
 	}
 
+	_, data, _ := value.ReadAll()
 	nt := &EventNotify{
 		Event: EventInit,
-		Value: value.RawBuf()[0:value.Readable()],
+		Value: data,
 	}
 	value.Release()
 	return nt, nil
@@ -99,21 +115,31 @@ func newLeaderChangerEvent(target, leader uint64) *EventNotify {
 }
 
 // ReadInitEventValues read all resource info
-func (evt *EventNotify) ReadInitEventValues() [][]byte {
+func (evt *EventNotify) ReadInitEventValues(resourceF func([]byte, uint64), containerF func([]byte)) {
 	if len(evt.Value) == 0 {
-		return nil
+		return
 	}
 
 	buf := goetty.NewByteBuf(len(evt.Value))
 	buf.Write(evt.Value)
-	n, _ := buf.ReadInt()
-	value := make([][]byte, n, n)
-	for i := 0; i < n; i++ {
+	rn, _ := buf.ReadInt()
+	cn, _ := buf.ReadInt()
+
+	for i := 0; i < rn; i++ {
 		size, _ := buf.ReadInt()
-		_, value[i], _ = buf.ReadBytes(size)
+		_, data, _ := buf.ReadBytes(size)
+		leader, _ := buf.ReadUInt64()
+		resourceF(data, leader)
 	}
+
+	for i := 0; i < cn; i++ {
+		size, _ := buf.ReadInt()
+		_, data, _ := buf.ReadBytes(size)
+		containerF(data)
+	}
+
 	buf.Release()
-	return value
+	return
 }
 
 // ReadLeaderChangerValue returns the target resource and the new leader
@@ -176,20 +202,22 @@ func (wn *watcherNotifier) onInitWatcher(msg *InitWatcher, conn goetty.IOSession
 	log.Infof("prophet: new watcher %s added", conn.RemoteIP())
 
 	if wn.eventC != nil {
-		nt, err := newInitEvent(wn.rt)
-		if err != nil {
-			log.Errorf("prophet: marshal init notify failed, errors:%+v", err)
-			conn.Close()
-			return
-		}
+		if MatchEvent(EventInit, msg.Flag) {
+			nt, err := newInitEvent(wn.rt)
+			if err != nil {
+				log.Errorf("prophet: marshal init notify failed, errors:%+v", err)
+				conn.Close()
+				return
+			}
 
-		err = conn.WriteAndFlush(nt)
-		if err != nil {
-			log.Errorf("prophet: notify to %s failed, errors:%+v",
-				conn.RemoteIP(),
-				err)
-			conn.Close()
-			return
+			err = conn.WriteAndFlush(nt)
+			if err != nil {
+				log.Errorf("prophet: notify to %s failed, errors:%+v",
+					conn.RemoteIP(),
+					err)
+				conn.Close()
+				return
+			}
 		}
 
 		wn.watchers.Store(conn.ID(), &watcher{
@@ -231,4 +259,38 @@ func (wn *watcherNotifier) start() {
 			return true
 		})
 	}
+}
+
+type snap struct {
+	resources  []Resource
+	containers []Container
+	leaders    map[uint64]uint64
+}
+
+func (rc *Runtime) snap() *snap {
+	rc.RLock()
+	defer rc.RUnlock()
+
+	value := &snap{
+		resources:  make([]Resource, len(rc.resources), len(rc.resources)),
+		containers: make([]Container, len(rc.containers), len(rc.containers)),
+		leaders:    make(map[uint64]uint64),
+	}
+
+	idx := 0
+	for _, c := range rc.containers {
+		value.containers[idx] = c.meta.Clone()
+		idx++
+	}
+
+	idx = 0
+	for _, r := range rc.resources {
+		value.resources[idx] = r.meta.Clone()
+		if r.leaderPeer != nil {
+			value.leaders[r.meta.ID()] = r.leaderPeer.ID
+		}
+		idx++
+	}
+
+	return value
 }

@@ -52,7 +52,7 @@ func (r *replicaChecker) Check(target *ResourceRuntime) Operator {
 func (r *replicaChecker) checkDownPeer(target *ResourceRuntime) Operator {
 	for _, stats := range target.downPeers {
 		peer := stats.Peer
-		container := r.rt.GetContainer(peer.ContainerID)
+		container := r.rt.Container(peer.ContainerID)
 
 		if nil != container && container.Downtime() < r.cfg.MaxAllowContainerDownDuration {
 			continue
@@ -70,7 +70,7 @@ func (r *replicaChecker) checkDownPeer(target *ResourceRuntime) Operator {
 
 func (r *replicaChecker) checkOfflinePeer(target *ResourceRuntime) Operator {
 	for _, peer := range target.meta.Peers() {
-		container := r.rt.GetContainer(peer.ContainerID)
+		container := r.rt.Container(peer.ContainerID)
 
 		if container != nil && container.IsUp() {
 			continue
@@ -96,7 +96,7 @@ func (r *replicaChecker) selectWorstPeer(target *ResourceRuntime, filters ...Fil
 
 	// Select the container with lowest distinct score.
 	// If the scores are the same, select the container with maximal resource score.
-	containers := r.rt.GetResourceContainers(target)
+	containers := r.rt.ResourceContainers(target)
 	for _, container := range containers {
 		if filterSource(container, filters) {
 			continue
@@ -129,8 +129,8 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 
 	// Select the container with best distinct score.
 	// If the scores are the same, select the container with minimal replica score.
-	containers := r.rt.GetResourceContainers(target)
-	for _, container := range r.rt.GetContainers() {
+	containers := r.rt.ResourceContainers(target)
+	for _, container := range r.rt.Containers() {
 		if filterTarget(container, filters) {
 			continue
 		}
