@@ -4,7 +4,13 @@ func (rc *Runtime) handleContainer(source *ContainerRuntime) {
 	rc.Lock()
 	defer rc.Unlock()
 
+	evt := EventContainerChanged
+	if _, ok := rc.containers[source.meta.ID()]; !ok {
+		evt = EventContainerCreated
+	}
+
 	rc.containers[source.meta.ID()] = source
+	rc.p.notifyEvent(newContainerEvent(evt, source.meta))
 }
 
 func (rc *Runtime) handleResource(source *ResourceRuntime) error {

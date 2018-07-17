@@ -15,11 +15,15 @@ var (
 	EventResourceLeaderChanged = 1 << 3
 	// EventResourceChaned event resource changed
 	EventResourceChaned = 1 << 4
-	// EventResourcePeersChaned event resource peers changed
-	EventResourcePeersChaned = 1 << 5
+	// EventContainerCreated  event container create
+	EventContainerCreated = 1 << 5
+	// EventContainerChanged  event container create
+	EventContainerChanged = 1 << 6
 
 	// EventFlagResource all resource event
-	EventFlagResource = EventResourceCreated | EventResourceLeaderChanged | EventResourceChaned | EventResourcePeersChaned
+	EventFlagResource = EventResourceCreated | EventResourceLeaderChanged | EventResourceChaned
+	// EventFlagContainer all container event
+	EventFlagContainer = EventContainerCreated | EventContainerChanged
 	// EventFlagAll all event
 	EventFlagAll = 0xffffffff
 )
@@ -90,6 +94,18 @@ func newInitEvent(rt *Runtime) (*EventNotify, error) {
 }
 
 func newResourceEvent(event int, target Resource) *EventNotify {
+	value, err := target.Marshal()
+	if err != nil {
+		return nil
+	}
+
+	return &EventNotify{
+		Event: event,
+		Value: value,
+	}
+}
+
+func newContainerEvent(event int, target Container) *EventNotify {
 	value, err := target.Marshal()
 	if err != nil {
 		return nil
