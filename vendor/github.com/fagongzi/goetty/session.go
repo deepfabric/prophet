@@ -14,6 +14,8 @@ import (
 var (
 	// ErrConnectServerSide error for can't connect to client at server side
 	ErrConnectServerSide = errors.New("can't connect to client at server side")
+
+	emptyTime time.Time
 )
 
 // IOSession session
@@ -327,9 +329,11 @@ func (s *clientIOSession) write(msg interface{}, flush bool) error {
 func (s *clientIOSession) readFromConn(timeout time.Duration) (bool, interface{}, error) {
 	if 0 != timeout {
 		s.conn.SetReadDeadline(time.Now().Add(timeout))
+	} else {
+		s.conn.SetReadDeadline(emptyTime)
 	}
 
-	_, err := io.Copy(s.in, s.conn)
+	n, err := io.Copy(s.in, s.conn)
 	if err != nil {
 		for _, sm := range s.svr.opts.middlewares {
 			oerr := sm.ReadError(err, s)
@@ -338,6 +342,10 @@ func (s *clientIOSession) readFromConn(timeout time.Duration) (bool, interface{}
 			}
 		}
 		return false, nil, err
+	}
+
+	if n == 0 {
+		return false, nil, io.EOF
 	}
 
 	return s.svr.opts.decoder.Decode(s.in)
