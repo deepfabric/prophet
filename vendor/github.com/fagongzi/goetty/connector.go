@@ -351,9 +351,11 @@ func (c *connector) write(msg interface{}, flush bool) error {
 func (c *connector) readFromConn(timeout time.Duration) (bool, interface{}, error) {
 	if 0 != timeout {
 		c.conn.SetReadDeadline(time.Now().Add(timeout))
+	} else {
+		c.conn.SetReadDeadline(emptyTime)
 	}
 
-	_, err := io.Copy(c.in, c.conn)
+	n, err := io.Copy(c.in, c.conn)
 	if err != nil {
 		for _, sm := range c.opts.middlewares {
 			oerr := sm.ReadError(err, c)
@@ -363,6 +365,10 @@ func (c *connector) readFromConn(timeout time.Duration) (bool, interface{}, erro
 		}
 
 		return false, nil, err
+	}
+
+	if n == 0 {
+		return false, nil, io.EOF
 	}
 
 	return c.opts.decoder.Decode(c.in)

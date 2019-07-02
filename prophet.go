@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
-
 	"github.com/fagongzi/goetty"
 )
 
@@ -88,7 +87,7 @@ func NewProphet(name string, addr string, adapter Adapter, opts ...Option) Proph
 		Addr: addr,
 	}
 	p.signature = p.node.marshal()
-	p.store = newEtcdStore(value.client, p.cfg.Namespace, adapter, p.signature)
+	p.store = newEtcdStore(value.client, adapter, p.signature)
 	p.runner = NewRunner()
 	p.coordinator = newCoordinator(value.cfg, p.runner, p.rt)
 	p.tcpL = goetty.NewServer(addr,

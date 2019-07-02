@@ -9,12 +9,6 @@ var (
 	replicaBaseScore = float64(100)
 )
 
-type emprtyHandler struct {
-}
-
-func (h *emprtyHandler) BecomeLeader()   {}
-func (h *emprtyHandler) BecomeFollower() {}
-
 // Cfg prophet cfg
 type Cfg struct {
 	// MaxScheduleRetries maximum retry times for schedule
@@ -50,7 +44,6 @@ type Cfg struct {
 	// MaxRPCTimeout rpc max timeout
 	MaxRPCTimeout time.Duration
 
-	Namespace   string
 	StorageNode bool
 	LeaseTTL    int64
 	Schedulers  []Scheduler
@@ -60,10 +53,6 @@ type Cfg struct {
 func (c *Cfg) adujst() {
 	if c.LeaseTTL == 0 {
 		c.LeaseTTL = 5
-	}
-
-	if c.Namespace == "" {
-		c.Namespace = "/prophet"
 	}
 
 	if c.MaxScheduleRetries == 0 {
@@ -161,3 +150,9 @@ func (c *Cfg) getDistinctScore(containers []*ContainerRuntime, other *ContainerR
 	}
 	return score
 }
+
+type emprtyHandler struct {
+}
+
+func (h *emprtyHandler) BecomeLeader()   {}
+func (h *emprtyHandler) BecomeFollower() {}
