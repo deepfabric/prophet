@@ -11,18 +11,14 @@ import (
 )
 
 var (
-	addr                = flag.String("prophet-addr", "127.0.0.1:9529", "Prophet: rpc address")
-	data                = flag.String("prophet-data", "/tmp/prophet", "Prophet: local data path")
-	join                = flag.String("prophet-addr-join", "", "Prophet: the target prohet cluster addr")
-	clientURLs          = flag.String("prophet-urls-client", "http://0.0.0.0:2379", "Prophet: embed etcd client urls")
-	peerURLs            = flag.String("prophet-urls-peer", "http://0.0.0.0:2381", "Prophet: embed etcd peer urls")
-	advertiseClientURLs = flag.String("prophet-urls-advertise-client", "http://127.0.0.1:2379", "Prophet: embed etcd client advertise urls")
-	advertisePeerURLs   = flag.String("prophet-urls-advertise-peer", "http://127.0.0.1:2381", "Prophet: embed etcd peer advertise urls")
-	storageNode         = flag.Bool("prophet-storage", true, "Prophet: is storage node, if true enable embed etcd server")
-
-	zone = flag.String("prophet-zone", "zone-1", "Zone label")
-	rack = flag.String("prophet-rack", "rack-1", "Rack label")
-
+	addr                             = flag.String("prophet-addr", "127.0.0.1:9529", "Prophet: rpc address")
+	data                             = flag.String("prophet-data", "/tmp/prophet", "Prophet: local data path")
+	join                             = flag.String("prophet-addr-join", "", "Prophet: the target prohet cluster addr")
+	clientURLs                       = flag.String("prophet-urls-client", "http://0.0.0.0:2379", "Prophet: embed etcd client urls")
+	peerURLs                         = flag.String("prophet-urls-peer", "http://0.0.0.0:2381", "Prophet: embed etcd peer urls")
+	advertiseClientURLs              = flag.String("prophet-urls-advertise-client", "http://127.0.0.1:2379", "Prophet: embed etcd client advertise urls")
+	advertisePeerURLs                = flag.String("prophet-urls-advertise-peer", "http://127.0.0.1:2381", "Prophet: embed etcd peer advertise urls")
+	storageNode                      = flag.Bool("prophet-storage", true, "Prophet: is storage node, if true enable embed etcd server")
 	leaderLeaseTTLSec                = flag.Int64("prophet-leader-lease", 5, "Prophet: seconds of leader lease ttl")
 	scheduleRetries                  = flag.Int("prophet-schedule-max-retry", 3, "Prophet: max schedule retries times when schedule failed")
 	scheduleMaxIntervalSec           = flag.Int("prophet-schedule-max-interval", 60, "Prophet: maximum seconds between twice schedules")
