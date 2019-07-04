@@ -380,7 +380,7 @@ func (s *etcdStore) getID() (uint64, error) {
 		return 0, err
 	}
 
-	if resp == nil {
+	if len(resp) == 0 {
 		return 0, nil
 	}
 
