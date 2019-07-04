@@ -44,6 +44,7 @@ func ParseProphetOptions(name string) []Option {
 	}
 
 	var opts []Option
+	opts = append(opts, WithRPCAddr(*addr))
 	opts = append(opts, WithLeaseTTL(*leaderLeaseTTLSec))
 	opts = append(opts, WithMaxScheduleRetries(*scheduleRetries))
 	opts = append(opts, WithMaxScheduleInterval(time.Second*time.Duration(*scheduleMaxIntervalSec)))
@@ -103,6 +104,13 @@ func (opts *options) adjust() {
 
 // Option is prophet create option
 type Option func(*options)
+
+// WithRPCAddr set rpc address
+func WithRPCAddr(value string) Option {
+	return func(opts *options) {
+		opts.cfg.RPCAddr = value
+	}
+}
 
 // WithExternalEtcd using  external etcd cluster
 func WithExternalEtcd(client *clientv3.Client) Option {

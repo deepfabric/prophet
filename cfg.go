@@ -11,6 +11,9 @@ var (
 
 // Cfg prophet cfg
 type Cfg struct {
+	// RPCAddr prophet rpc addr
+	RPCAddr string
+
 	// MaxScheduleRetries maximum retry times for schedule
 	MaxScheduleRetries int
 	// MaxScheduleInterval maximum schedule interval per scheduler
