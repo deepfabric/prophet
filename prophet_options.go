@@ -13,6 +13,7 @@ import (
 var (
 	addr                             = flag.String("prophet-addr", "127.0.0.1:9529", "Prophet: rpc address")
 	data                             = flag.String("prophet-data", "/tmp/prophet", "Prophet: local data path")
+	redirectEmbedEtcdLog             = flag.String("prophet-redirect-etcd-log", "", "Prophet: redirect etcd log")
 	join                             = flag.String("prophet-addr-join", "", "Prophet: the target prohet cluster addr")
 	clientURLs                       = flag.String("prophet-urls-client", "http://0.0.0.0:2379", "Prophet: embed etcd client urls")
 	peerURLs                         = flag.String("prophet-urls-peer", "http://0.0.0.0:2381", "Prophet: embed etcd peer urls")
@@ -64,6 +65,7 @@ func ParseProphetOptions(name string) []Option {
 
 	if *storageNode {
 		embedEtcdCfg := &EmbeddedEtcdCfg{}
+		embedEtcdCfg.EmbedEtcdLog = *redirectEmbedEtcdLog
 		embedEtcdCfg.Join = *join
 		embedEtcdCfg.DataPath = fmt.Sprintf("%s/prophet", *data)
 		embedEtcdCfg.Name = name

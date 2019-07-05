@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/coreos/etcd/embed"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/pkg/types"
+	"github.com/coreos/pkg/capnslog"
 )
 
 // unixToHTTP replace unix scheme with http.
@@ -25,9 +27,10 @@ var (
 
 // EmbeddedEtcdCfg cfg for embedded etcd
 type EmbeddedEtcdCfg struct {
-	Name     string
-	DataPath string
-	Join     string
+	Name         string
+	DataPath     string
+	Join         string
+	EmbedEtcdLog string
 
 	URLsClient          string
 	URLsAdvertiseClient string
@@ -88,6 +91,15 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 }
 
 func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
+	if ecfg.EmbedEtcdLog != "" {
+		f, err := os.OpenFile(ecfg.EmbedEtcdLog, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		if err != nil {
+			log.Fatal("redirect embed log to %s failed with %+v", ecfg.EmbedEtcdLog, err)
+		}
+		capnslog.SetFormatter(capnslog.NewPrettyFormatter(f, false))
+		capnslog.SetGlobalLogLevel(capnslog.DEBUG)
+	}
+
 	err := prepareJoin(ecfg)
 	if err != nil {
 		log.Fatalf("prophet: prepare join embed etcd failed with %+v",
