@@ -64,6 +64,7 @@ func (ps *PeerStats) Clone() *PeerStats {
 type Resource interface {
 	Serializable
 
+	SetID(id uint64)
 	ID() uint64
 	Peers() []*Peer
 	SetPeers(peers []*Peer)
@@ -85,6 +86,7 @@ type Pair struct {
 type Container interface {
 	Serializable
 
+	SetID(id uint64)
 	ID() uint64
 	Lables() []Pair
 	State() State
