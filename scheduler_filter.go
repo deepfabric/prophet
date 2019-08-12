@@ -26,6 +26,10 @@ func filterTarget(container *ContainerRuntime, filters []Filter) bool {
 	return false
 }
 
+type labelFilter struct {
+	labels []Pair
+}
+
 type stateFilter struct {
 	cfg *Cfg
 }
@@ -112,6 +116,11 @@ func NewSnapshotCountFilter(cfg *Cfg) Filter {
 	return &snapshotCountFilter{cfg: cfg}
 }
 
+// NewLabelFilter returns label filter, if the container missing the labels, skip it.
+func NewLabelFilter(labels []Pair) Filter {
+	return &labelFilter{labels: labels}
+}
+
 func (f *stateFilter) filter(container *ContainerRuntime) bool {
 	return !(container.IsUp() && container.Downtime() < f.cfg.MaxAllowContainerDownDuration)
 }
@@ -196,5 +205,23 @@ func (f *snapshotCountFilter) FilterSource(container *ContainerRuntime) bool {
 }
 
 func (f *snapshotCountFilter) FilterTarget(container *ContainerRuntime) bool {
+	return f.filter(container)
+}
+
+func (f *labelFilter) filter(container *ContainerRuntime) bool {
+	for _, l := range f.labels {
+		if l.Value != container.GetLabelValue(l.Key) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (f *labelFilter) FilterSource(container *ContainerRuntime) bool {
+	return f.filter(container)
+}
+
+func (f *labelFilter) FilterTarget(container *ContainerRuntime) bool {
 	return f.filter(container)
 }

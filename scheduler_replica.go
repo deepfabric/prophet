@@ -121,6 +121,7 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 	filters = append(filters, NewStateFilter(r.cfg))
 	filters = append(filters, NewStorageThresholdFilter(r.cfg))
 	filters = append(filters, NewExcludedFilter(nil, target.GetContainerIDs()))
+	filters = append(filters, NewLabelFilter(target.meta.Labels())) // make sure the container has the tags needed for the resource
 
 	var (
 		bestContainer *ContainerRuntime

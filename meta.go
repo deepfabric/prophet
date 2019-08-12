@@ -71,6 +71,7 @@ type Resource interface {
 	Stale(other Resource) bool
 	Changed(other Resource) bool
 	Clone() Resource
+	Labels() []Pair
 
 	Marshal() ([]byte, error)
 	Unmarshal(data []byte) error
@@ -78,7 +79,8 @@ type Resource interface {
 
 // Pair key value pair
 type Pair struct {
-	Key, Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // Container is the resource container, the resource is running on the container
@@ -90,7 +92,6 @@ type Container interface {
 	ID() uint64
 	Labels() []Pair
 	State() State
-
 	Clone() Container
 
 	Marshal() ([]byte, error)
