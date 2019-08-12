@@ -181,7 +181,7 @@ func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 		ls.MustPutResource(res)
 	}
 
-	ok, err := ls.pd.GetStore().PutBootstrapped(ls.meta, initResources[0])
+	ok, err := ls.pd.GetStore().PutBootstrapped(ls.meta, initResources...)
 	if err != nil {
 		for _, res := range initResources {
 			ls.MustRemoveResource(res.ID())

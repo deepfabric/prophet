@@ -34,8 +34,8 @@ type codecSerializable interface {
 
 // Peer is the resource peer
 type Peer struct {
-	ID          uint64
-	ContainerID uint64
+	ID          uint64 `json:"id"`
+	ContainerID uint64 `json:"cid"`
 }
 
 // Clone returns a clone value
@@ -88,7 +88,7 @@ type Container interface {
 
 	SetID(id uint64)
 	ID() uint64
-	Lables() []Pair
+	Labels() []Pair
 	State() State
 
 	Clone() Container

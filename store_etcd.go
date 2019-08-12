@@ -336,7 +336,7 @@ func (s *etcdStore) generate() (uint64, error) {
 }
 
 // PutBootstrapped put cluster is bootstrapped
-func (s *etcdStore) PutBootstrapped(container Container, res Resource) (bool, error) {
+func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) (bool, error) {
 	ctx, cancel := context.WithTimeout(s.client.Ctx(), DefaultTimeout)
 	defer cancel()
 
@@ -349,12 +349,14 @@ func (s *etcdStore) PutBootstrapped(container Container, res Resource) (bool, er
 	}
 	ops = append(ops, clientv3.OpPut(s.getKey(container.ID(), s.containerPath), string(meta)))
 
-	meta, err = res.Marshal()
-	if err != nil {
-		return false, err
+	for _, res := range resources {
+		meta, err = res.Marshal()
+		if err != nil {
+			return false, err
+		}
+		ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
+		ops = append(ops, clientv3.OpPut(s.clusterPath, string(meta)))
 	}
-	ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
-	ops = append(ops, clientv3.OpPut(s.clusterPath, string(meta)))
 
 	// txn
 	resp, err := s.client.Txn(ctx).

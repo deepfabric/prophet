@@ -40,7 +40,7 @@ func (cr *ContainerRuntime) GetLocationID(keys []string) string {
 
 // GetLabelValue returns label value of key
 func (cr *ContainerRuntime) GetLabelValue(key string) string {
-	for _, label := range cr.meta.Lables() {
+	for _, label := range cr.meta.Labels() {
 		if label.Key == key {
 			return label.Value
 		}

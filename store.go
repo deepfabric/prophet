@@ -29,5 +29,5 @@ type Store interface {
 	AllocID() (uint64, error)
 
 	// PutBootstrapped put cluster is bootstrapped
-	PutBootstrapped(container Container, res Resource) (bool, error)
+	PutBootstrapped(container Container, resources ...Resource) (bool, error)
 }
