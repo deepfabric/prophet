@@ -95,7 +95,8 @@ type ContainerHeartbeatReq struct {
 	SendingSnapCount   uint64    `json:"sendingSnapCount"`
 	ReceivingSnapCount uint64    `json:"receivingSnapCount"`
 	ApplyingSnapCount  uint64    `json:"applyingSnapCount"`
-	Busy               bool      `json:"busy"`
+	Busy               bool      `json:"busy"`  // stop replica balance
+	Block              bool      `json:"block"` // stop leader balance
 	Container          Container `json:"-"`
 }
 

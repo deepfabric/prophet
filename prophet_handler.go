@@ -59,6 +59,7 @@ func (p *defaultProphet) handleContainerHeartbeat(msg *ContainerHeartbeatReq) er
 		container = newContainerRuntime(meta)
 	}
 
+	container.blocked = msg.Block
 	container.busy = msg.Busy
 	container.leaderCount = msg.LeaderCount
 	container.replicaCount = msg.ReplicaCount
