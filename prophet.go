@@ -10,8 +10,8 @@ import (
 
 // RoleChangeHandler prophet role change handler
 type RoleChangeHandler interface {
-	BecomeLeader()
-	BecomeFollower()
+	ProphetBecomeLeader()
+	ProphetBecomeFollower()
 }
 
 // Adapter prophet adapter

@@ -38,8 +38,9 @@ var (
 	rpcTimeoutSec                    = flag.Int("prophet-rpc-timeout", 10, "Prophet(Sec): maximum timeout to wait rpc response")
 )
 
-// ParseProphetOptions parse the prophet options from command line parameter
-func ParseProphetOptions(name string) []Option {
+// ParseProphetOptionsWithPath parse the prophet options from command line parameter,
+// using spec data path for embed etcd server
+func ParseProphetOptionsWithPath(name, path string) []Option {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
@@ -64,10 +65,15 @@ func ParseProphetOptions(name string) []Option {
 	opts = append(opts, WithMaxRPCTimeout(time.Second*time.Duration(*rpcTimeoutSec)))
 
 	if *storageNode {
+		realPath := path
+		if realPath == "" {
+			realPath = fmt.Sprintf("%s/prophet", *data)
+		}
+
 		embedEtcdCfg := &EmbeddedEtcdCfg{}
 		embedEtcdCfg.EmbedEtcdLog = *redirectEmbedEtcdLog
 		embedEtcdCfg.Join = *join
-		embedEtcdCfg.DataPath = fmt.Sprintf("%s/prophet", *data)
+		embedEtcdCfg.DataPath = realPath
 		embedEtcdCfg.Name = name
 		embedEtcdCfg.URLsAdvertiseClient = *advertiseClientURLs
 		embedEtcdCfg.URLsAdvertisePeer = *advertisePeerURLs
@@ -89,6 +95,11 @@ func ParseProphetOptions(name string) []Option {
 	}
 
 	return opts
+}
+
+// ParseProphetOptions parse the prophet options from command line parameter
+func ParseProphetOptions(name string) []Option {
+	return ParseProphetOptionsWithPath(name, "")
 }
 
 type options struct {
@@ -125,7 +136,7 @@ func WithExternalEtcd(client *clientv3.Client) Option {
 // WithEmbeddedEtcd using embedded etcd cluster
 func WithEmbeddedEtcd(cfg *EmbeddedEtcdCfg) Option {
 	return func(opts *options) {
-		opts.client = initWithEmbedEtcd(cfg)
+		initWithEmbedEtcd(cfg, opts)
 		opts.cfg.StorageNode = true
 	}
 }
@@ -260,5 +271,12 @@ func WithMaxRPCConnIdle(value time.Duration) Option {
 func WithMaxRPCTimeout(value time.Duration) Option {
 	return func(opts *options) {
 		opts.cfg.MaxRPCTimeout = value
+	}
+}
+
+// WithScaleOnNewStore set EnableScaleOnNewStore
+func WithScaleOnNewStore() Option {
+	return func(opts *options) {
+		opts.cfg.EnableScaleOnNewStore = true
 	}
 }

@@ -21,6 +21,10 @@ func (p *defaultProphet) handleResourceHeartbeat(msg *ResourceHeartbeatReq) (*re
 		return nil, errReq
 	}
 
+	if len(msg.Resource.Peers()) == 0 {
+		return nil, errReq
+	}
+
 	value := newResourceRuntime(msg.Resource, msg.LeaderPeer)
 	value.downPeers = msg.DownPeers
 	value.pendingPeers = msg.PendingPeers
@@ -30,11 +34,13 @@ func (p *defaultProphet) handleResourceHeartbeat(msg *ResourceHeartbeatReq) (*re
 
 	err := p.rt.handleResource(value)
 	if err != nil {
-		return nil, err
-	}
+		if err == errStaleResource {
+			return newChangePeerRsp(msg.Resource.ID(),
+				value.GetContainerPeer(msg.ContainerID),
+				RemovePeer), nil
+		}
 
-	if len(value.meta.Peers()) == 0 {
-		return nil, errReq
+		return nil, err
 	}
 
 	return p.coordinator.dispatch(p.rt.Resource(value.meta.ID())), nil

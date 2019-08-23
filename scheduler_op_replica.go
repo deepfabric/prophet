@@ -12,6 +12,8 @@ var (
 	AddPeer = ChangePeerType(0)
 	// RemovePeer remove peer
 	RemovePeer = ChangePeerType(1)
+	// ScalePeer scale peer
+	ScalePeer = ChangePeerType(2)
 )
 
 func newAddPeerAggregationOp(cfg *Cfg, target *ResourceRuntime, peer *Peer) Operator {
@@ -83,4 +85,38 @@ func (op *changePeerOperator) Do(target *ResourceRuntime) (*resourceHeartbeatRsp
 	}
 
 	return newChangePeerRsp(op.ID, op.Peer, op.Type), false
+}
+
+func newScalePeerOp(id uint64, containerID uint64) *scaleOperator {
+	return &scaleOperator{
+		Name:        "scale_peer",
+		ID:          id,
+		ContainerID: containerID,
+	}
+}
+
+type scaleOperator struct {
+	Name        string `json:"name"`
+	ID          uint64 `json:"id"`
+	ContainerID uint64 `json:"containerID"`
+}
+
+func (op *scaleOperator) String() string {
+	return fmt.Sprintf("%+v", *op)
+}
+
+func (op *scaleOperator) ResourceID() uint64 {
+	return op.ID
+}
+
+func (op *scaleOperator) ResourceKind() ResourceKind {
+	return ReplicaKind
+}
+
+func (op *scaleOperator) Do(target *ResourceRuntime) (*resourceHeartbeatRsp, bool) {
+	if target.meta.ScaleCompleted(op.ContainerID) {
+		return nil, true
+	}
+
+	return newScalePeerRsp(op.ID, op.ContainerID), false
 }

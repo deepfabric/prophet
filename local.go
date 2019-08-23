@@ -21,7 +21,8 @@ var (
 )
 
 func getResourceKey(id uint64) []byte {
-	buf := make([]byte, 0, len(resourcesPrefix)+8)
+	n := len(resourcesPrefix) + 8
+	buf := make([]byte, n, n)
 	copy(buf[0:len(resourcesPrefix)], resourcesPrefix)
 	binary.BigEndian.PutUint64(buf[len(resourcesPrefix):], id)
 	return buf
@@ -32,21 +33,21 @@ type LocalStorage interface {
 	// Get returns the key value
 	Get(key []byte) ([]byte, error)
 	// Set sets the key value to the local storage
-	Set(key, value []byte) error
+	Set(pairs ...[]byte) error
 	// Remove remove the key from the local storage
-	Remove(key []byte) error
+	Remove(keys ...[]byte) error
 	// Range visit all values that start with prefix, set limit to 0 for no limit
 	Range(prefix []byte, limit uint64, fn func(key, value []byte) bool) error
 }
 
 type localDB interface {
-	get(key []byte) ([]byte, error)
-	set(key, value []byte) error
+	get([]byte) ([]byte, error)
+	set(...[]byte) error
 
 	countResources() (int, error)
-	loadResources(handleFunc func(value []byte) (uint64, error)) error
-	putResource(res Resource) error
-	removeResource(resID uint64) error
+	loadResources(func(value []byte) (uint64, error)) error
+	putResource(...Resource) error
+	removeResource(...uint64) error
 }
 
 type defaultLocalDB struct {
@@ -79,20 +80,32 @@ func (db *defaultLocalDB) countResources() (int, error) {
 	return c, nil
 }
 
-func (db *defaultLocalDB) putResource(res Resource) error {
-	data, err := res.Marshal()
-	if err != nil {
-		return err
+func (db *defaultLocalDB) putResource(reses ...Resource) error {
+	var pairs [][]byte
+
+	for _, res := range reses {
+		data, err := res.Marshal()
+		if err != nil {
+			return err
+		}
+
+		pairs = append(pairs, getResourceKey(res.ID()), data)
 	}
-	return db.set(getResourceKey(res.ID()), data)
+
+	return db.set(pairs...)
 }
 
-func (db *defaultLocalDB) removeResource(resID uint64) error {
-	return db.storage.Remove(getResourceKey(resID))
+func (db *defaultLocalDB) removeResource(resIDs ...uint64) error {
+	var keys [][]byte
+	for _, resID := range resIDs {
+		keys = append(keys, getResourceKey(resID))
+	}
+
+	return db.storage.Remove(keys...)
 }
 
-func (db *defaultLocalDB) set(key, value []byte) error {
-	return db.storage.Set(key, value)
+func (db *defaultLocalDB) set(pairs ...[]byte) error {
+	return db.storage.Set(pairs...)
 }
 
 func (db *defaultLocalDB) get(key []byte) ([]byte, error) {
@@ -105,10 +118,10 @@ type LocalStore interface {
 	BootstrapCluster(initResources ...Resource)
 
 	// MustPutResource put the resource to local
-	MustPutResource(Resource)
+	MustPutResource(...Resource)
 
 	// MustRemoveResource remove the res from the local
-	MustRemoveResource(uint64)
+	MustRemoveResource(...uint64)
 
 	// MustAllocID returns the new id by pd
 	MustAllocID() uint64
@@ -137,7 +150,7 @@ type defaultLocalStore struct {
 
 func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 	if len(initResources) == 0 {
-		log.Fatalf("init resources can not empty")
+		log.Warnf("init with empty resources")
 	}
 
 	data, err := ls.db.get(containerKey)
@@ -166,7 +179,7 @@ func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 		log.Fatal("local container is not empty and has already had data")
 	}
 
-	data = make([]byte, 0, 8)
+	data = make([]byte, 8, 8)
 	binary.BigEndian.PutUint64(data, id)
 	err = ls.db.set(containerKey, data)
 	if err != nil {
@@ -199,8 +212,8 @@ func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 	ls.pd.GetRPC().TiggerContainerHeartbeat()
 }
 
-func (ls *defaultLocalStore) MustPutResource(res Resource) {
-	err := ls.db.putResource(res)
+func (ls *defaultLocalStore) MustPutResource(res ...Resource) {
+	err := ls.db.putResource(res...)
 	if err != nil {
 		log.Fatalf("save resource %+v failed with %+v",
 			res,
@@ -208,11 +221,11 @@ func (ls *defaultLocalStore) MustPutResource(res Resource) {
 	}
 }
 
-func (ls *defaultLocalStore) MustRemoveResource(resID uint64) {
-	err := ls.db.removeResource(resID)
+func (ls *defaultLocalStore) MustRemoveResource(resIDs ...uint64) {
+	err := ls.db.removeResource(resIDs...)
 	if err != nil {
 		log.Fatalf("remove resource %d failed with %+v",
-			resID,
+			resIDs,
 			err)
 	}
 }

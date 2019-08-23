@@ -51,6 +51,8 @@ type Cfg struct {
 	LeaseTTL    int64
 	Schedulers  []Scheduler
 	Handler     RoleChangeHandler
+
+	EnableScaleOnNewStore bool
 }
 
 func (c *Cfg) adujst() {
@@ -157,5 +159,5 @@ func (c *Cfg) getDistinctScore(containers []*ContainerRuntime, other *ContainerR
 type emprtyHandler struct {
 }
 
-func (h *emprtyHandler) BecomeLeader()   {}
-func (h *emprtyHandler) BecomeFollower() {}
+func (h *emprtyHandler) ProphetBecomeLeader()   {}
+func (h *emprtyHandler) ProphetBecomeFollower() {}

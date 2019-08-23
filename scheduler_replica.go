@@ -18,7 +18,7 @@ func newReplicaChecker(cfg *Cfg, rt *Runtime, filters ...Filter) *replicaChecker
 	}
 }
 
-// Check return the Operator
+// Check return the Operator to add or remove replica
 func (r *replicaChecker) Check(target *ResourceRuntime) Operator {
 	if op := r.checkDownPeer(target); op != nil {
 		return op

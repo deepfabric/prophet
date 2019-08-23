@@ -31,6 +31,7 @@ type ResourceHeartbeatReq struct {
 	LeaderPeer   *Peer        `json:"leaderPeer"`
 	DownPeers    []*PeerStats `json:"downPeers"`
 	PendingPeers []*Peer      `json:"pendingPeers"`
+	ContainerID  uint64       `json:"cid"`
 }
 
 // Init init
@@ -56,10 +57,11 @@ func (req *ResourceHeartbeatReq) Prepare() error {
 }
 
 type resourceHeartbeatRsp struct {
-	ResourceID uint64         `json:"resourceID"`
-	NewLeader  *Peer          `json:"newLeader"`
-	Peer       *Peer          `json:"peer"`
-	ChangeType ChangePeerType `json:"changeType"`
+	ResourceID  uint64         `json:"resourceID"`
+	NewLeader   *Peer          `json:"newLeader"`
+	Peer        *Peer          `json:"peer"`
+	ChangeType  ChangePeerType `json:"changeType"`
+	ContainerID uint64         `json:"containerID"`
 }
 
 type getContainerReq struct {
@@ -82,6 +84,14 @@ func newChangePeerRsp(resourceID uint64, peer *Peer, changeType ChangePeerType) 
 		ResourceID: resourceID,
 		Peer:       peer,
 		ChangeType: changeType,
+	}
+}
+
+func newScalePeerRsp(resourceID uint64, containerID uint64) *resourceHeartbeatRsp {
+	return &resourceHeartbeatRsp{
+		ResourceID:  resourceID,
+		ContainerID: containerID,
+		ChangeType:  ScalePeer,
 	}
 }
 

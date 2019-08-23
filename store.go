@@ -8,14 +8,16 @@ type Store interface {
 	// ResignLeader delete leader itself and let others start a new election again.
 	ResignLeader() error
 	// GetCurrentLeader return current leader
-	GetCurrentLeader() (*Node, error)
+	GetCurrentLeader() (*Node, int64, error)
 	// WatchLeader watch leader,
 	// this funcation will return unitl the leader's lease is timeout
 	// or server closed
-	WatchLeader()
+	WatchLeader(int64)
 
 	// PutResource puts the meta to the store
 	PutResource(meta Resource) error
+	// GetResource returns the spec resource
+	GetResource(id uint64) (Resource, error)
 	// PutContainer puts the meta to the store
 	PutContainer(meta Container) error
 	// GetContainer returns the spec container
@@ -30,4 +32,11 @@ type Store interface {
 
 	// PutBootstrapped put cluster is bootstrapped
 	PutBootstrapped(container Container, resources ...Resource) (bool, error)
+
+	// PutIfNotExists put the value at path
+	// returns true, nil, nil if created
+	// returns false, exists, nil if not created
+	PutIfNotExists(path string, value []byte) (bool, []byte, error)
+	// RemoveIfValueMatched returns true if the expect value is and the exists value are matched
+	RemoveIfValueMatched(path string, expect []byte) (bool, error)
 }

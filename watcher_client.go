@@ -12,9 +12,11 @@ import (
 type Watcher struct {
 	sync.RWMutex
 
-	ops   uint64
-	addrs []string
-	conn  goetty.IOSession
+	ops           uint64
+	addrs         []string
+	p             *defaultProphet
+	conn          goetty.IOSession
+	resetConnFunc func(int)
 
 	eventC chan *EventNotify
 	stopC  chan struct{}
@@ -22,10 +24,24 @@ type Watcher struct {
 
 // NewWatcher returns a watcher for watch
 func NewWatcher(addrs ...string) *Watcher {
-	return &Watcher{
+	w := &Watcher{
 		addrs: addrs,
 		stopC: make(chan struct{}, 1),
 	}
+
+	w.resetConnFunc = w.resetConn
+	return w
+}
+
+// NewWatcherWithProphet returns a watcher for watch
+func NewWatcherWithProphet(p Prophet) *Watcher {
+	w := &Watcher{
+		p:     p.(*defaultProphet),
+		stopC: make(chan struct{}, 1),
+	}
+
+	w.resetConnFunc = w.resetConnWithProphet
+	return w
 }
 
 // Watch watch event
@@ -78,6 +94,23 @@ func (w *Watcher) resetConn(flag int) {
 	}
 }
 
+func (w *Watcher) resetConnWithProphet(flag int) {
+	for {
+		conn := w.p.getLeaderClient()
+		err := conn.WriteAndFlush(&InitWatcher{
+			Flag: flag,
+		})
+		if err != nil {
+			time.Sleep(time.Millisecond * 200)
+			conn.Close()
+			continue
+		}
+
+		w.conn = conn
+		return
+	}
+}
+
 func (w *Watcher) watchDog(flag int) {
 	for {
 		select {
@@ -85,7 +118,7 @@ func (w *Watcher) watchDog(flag int) {
 			w.conn.Close()
 			return
 		default:
-			w.resetConn(flag)
+			w.resetConnFunc(flag)
 			w.startReadLoop()
 		}
 	}

@@ -50,7 +50,7 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 	cfg.InitialCluster = c.InitialCluster
 	cfg.ClusterState = c.InitialClusterState
 	cfg.EnablePprof = false
-	cfg.Debug = false
+	cfg.Debug = true
 
 	var err error
 	cfg.LPUrls, err = parseUrls(c.URLsPeer)
@@ -90,7 +90,7 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 	return cfg, nil
 }
 
-func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
+func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg, opts *options) {
 	if ecfg.EmbedEtcdLog != "" {
 		f, err := os.OpenFile(ecfg.EmbedEtcdLog, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 		if err != nil {
@@ -122,19 +122,17 @@ func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	select {
 	case <-etcd.Server.ReadyNotify():
 		log.Info("prophet: embed etcd is ready")
-		return doAfterEmbedEtcdServerReady(etcd, cfg, ecfg)
+		doAfterEmbedEtcdServerReady(etcd, cfg, ecfg, opts)
 	case <-time.After(time.Minute * 5):
 		log.Fatalf("prophet: start embed etcd timeout")
 	}
-
-	return nil
 }
 
-func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg) *clientv3.Client {
+func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg, opts *options) {
 	checkEtcdCluster(etcd, ecfg)
 
 	id := uint64(etcd.Server.ID())
-	log.Infof("prophet: embed server ids, current %d, leader %d",
+	log.Infof("prophet: embed server ids, current %X, leader %X",
 		id,
 		etcd.Server.Leader())
 
@@ -154,11 +152,29 @@ func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *Embe
 		log.Fatalf("prophet: etcd start failure, errors:\n%+v", err)
 	}
 
-	return client
+	opts.client = client
+	// update client endpoint
+	go func() {
+		for {
+			members, err := getCurrentClusterMembers(client)
+			if err != nil {
+				log.Fatalf("prophet: get current members of etcd cluster failed with %+v", err)
+			}
+
+			var eps []string
+			for _, m := range members.Members {
+				eps = append(eps, m.GetClientURLs()...)
+			}
+			client.SetEndpoints(eps...)
+			log.Infof("prophet: etcd client endpoints set to %+v", eps)
+
+			time.Sleep(time.Second * 10)
+		}
+	}()
 }
 
 func initEtcdClient(ecfg *EmbeddedEtcdCfg) (*clientv3.Client, error) {
-	clientAddrs := strings.Split(getStringValue(ecfg.URLsAdvertisePeer, ecfg.URLsPeer), ",")
+	clientAddrs := strings.Split(getStringValue(ecfg.URLsAdvertiseClient, ecfg.URLsClient), ",")
 	if ecfg.Join != "" {
 		clientAddrs = strings.Split(ecfg.Join, ",")
 	}

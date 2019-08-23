@@ -42,58 +42,71 @@ func newSimpleRPC(prophet *defaultProphet) *simpleRPC {
 	}
 }
 
+func (rpc *simpleRPC) wait(conn *clientConn) {
+	if nil != conn {
+		rpc.closeConn(conn)
+	}
+	time.Sleep(time.Millisecond * 100)
+}
+
 // AllocID returns uint64 id
 func (rpc *simpleRPC) AllocID() (uint64, error) {
-	conn, err := rpc.acquireConn()
-	if err != nil {
-		return 0, err
-	}
-
 	for {
-		err = conn.c.WriteAndFlush(&allocIDReq{})
+		conn, err := rpc.acquireConn()
 		if err != nil {
-			rpc.closeConn(conn)
-			return 0, err
+			rpc.wait(conn)
+			continue
 		}
 
-		value, err := conn.c.ReadTimeout(rpc.maxTimeout)
-		if err != nil {
-			rpc.closeConn(conn)
-			return 0, err
-		}
+		for {
+			err = conn.c.WriteAndFlush(&allocIDReq{})
+			if err != nil {
+				rpc.wait(conn)
+				break
+			}
 
-		if rsp, ok := value.(*allocIDRsp); ok {
-			rpc.releaseConn(conn)
-			return rsp.ID, rsp.Err
+			value, err := conn.c.ReadTimeout(rpc.maxTimeout)
+			if err != nil {
+				rpc.wait(conn)
+				break
+			}
+
+			if rsp, ok := value.(*allocIDRsp); ok {
+				rpc.releaseConn(conn)
+				return rsp.ID, rsp.Err
+			}
 		}
 	}
 }
 
 // AskSplit ask split, returns the new resource id and it's peer ids
 func (rpc *simpleRPC) AskSplit(res Resource) (uint64, []uint64, error) {
-	conn, err := rpc.acquireConn()
-	if err != nil {
-		return 0, nil, err
-	}
-
 	for {
-		err = conn.c.WriteAndFlush(&askSplitReq{
-			Resource: res,
-		})
+		conn, err := rpc.acquireConn()
 		if err != nil {
-			rpc.closeConn(conn)
-			return 0, nil, err
+			rpc.wait(conn)
+			continue
 		}
 
-		value, err := conn.c.ReadTimeout(rpc.maxTimeout)
-		if err != nil {
-			rpc.closeConn(conn)
-			return 0, nil, err
-		}
+		for {
+			err = conn.c.WriteAndFlush(&askSplitReq{
+				Resource: res,
+			})
+			if err != nil {
+				rpc.wait(conn)
+				break
+			}
 
-		if rsp, ok := value.(*askSplitRsp); ok {
-			rpc.releaseConn(conn)
-			return rsp.NewID, rsp.NewPeerIDs, rsp.Err
+			value, err := conn.c.ReadTimeout(rpc.maxTimeout)
+			if err != nil {
+				rpc.wait(conn)
+				break
+			}
+
+			if rsp, ok := value.(*askSplitRsp); ok {
+				rpc.releaseConn(conn)
+				return rsp.NewID, rsp.NewPeerIDs, rsp.Err
+			}
 		}
 	}
 }
@@ -103,13 +116,18 @@ func (rpc *simpleRPC) TiggerResourceHeartbeat(id uint64) {
 }
 
 func (rpc *simpleRPC) TiggerContainerHeartbeat() {
+	req := rpc.prophet.adapter.FetchContainerHB()
+	if req == nil {
+		return
+	}
+
 	conn, err := rpc.acquireConn()
 	if err != nil {
 		return
 	}
 
 	for {
-		err = conn.c.WriteAndFlush(rpc.prophet.adapter.FetchContainerHB())
+		err = conn.c.WriteAndFlush(req)
 		if err != nil {
 			rpc.closeConn(conn)
 			return

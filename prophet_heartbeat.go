@@ -11,6 +11,7 @@ import (
 type HeartbeatHandler interface {
 	ChangeLeader(resourceID uint64, newLeader *Peer)
 	ChangePeer(resourceID uint64, peer *Peer, changeType ChangePeerType)
+	ScaleResource(resourceID uint64, byContainerID uint64)
 }
 
 func (p *defaultProphet) startResourceHeartbeatLoop() {
@@ -85,6 +86,8 @@ func (p *defaultProphet) doResourceHeartbeatLoop() {
 						p.adapter.HBHandler().ChangeLeader(rsp.ResourceID, rsp.NewLeader)
 					} else if rsp.Peer != nil {
 						p.adapter.HBHandler().ChangePeer(rsp.ResourceID, rsp.Peer, rsp.ChangeType)
+					} else if rsp.ContainerID > 0 {
+						p.adapter.HBHandler().ScaleResource(rsp.ResourceID, rsp.ContainerID)
 					}
 				}
 			}

@@ -31,7 +31,7 @@ func (p *defaultProphet) startLeaderLoop() {
 				return
 			default:
 				log.Infof("prophet: ready to fetch leader")
-				leader, err := p.store.GetCurrentLeader()
+				leader, rev, err := p.store.GetCurrentLeader()
 				if err != nil {
 					log.Errorf("prophet: get current leader failure, errors:\n %+v",
 						err)
@@ -58,9 +58,9 @@ func (p *defaultProphet) startLeaderLoop() {
 							leader)
 						p.leader = leader // reset leader node for forward
 						p.notifyElectionComplete()
-						p.cfg.Handler.BecomeFollower()
+						p.cfg.Handler.ProphetBecomeFollower()
 						log.Infof("prophet: leader changed to %v", leader)
-						p.store.WatchLeader()
+						p.store.WatchLeader(rev)
 						log.Infof("prophet: leader %v out", leader)
 					}
 				}
@@ -95,7 +95,7 @@ func (p *defaultProphet) enableLeader() {
 	atomic.StoreInt64(&p.leaderFlag, 1)
 
 	p.notifyElectionComplete()
-	p.cfg.Handler.BecomeLeader()
+	p.cfg.Handler.ProphetBecomeLeader()
 }
 
 func (p *defaultProphet) disableLeader() {
@@ -113,7 +113,7 @@ func (p *defaultProphet) disableLeader() {
 		p.wn.stop()
 	}
 
-	p.cfg.Handler.BecomeFollower()
+	p.cfg.Handler.ProphetBecomeFollower()
 }
 
 func (p *defaultProphet) isLeader() bool {

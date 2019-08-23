@@ -74,23 +74,23 @@ func newEtcdStore(client *clientv3.Client, adapter Adapter, signature string) St
 	}
 }
 
-func (s *etcdStore) GetCurrentLeader() (*Node, error) {
-	resp, err := s.getValue(s.leaderPath)
+func (s *etcdStore) GetCurrentLeader() (*Node, int64, error) {
+	resp, rev, err := s.getValue(s.leaderPath)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if nil == resp {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	v := &Node{}
 	err = json.Unmarshal(resp, v)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return v, nil
+	return v, rev, nil
 }
 
 func (s *etcdStore) ResignLeader() error {
@@ -106,14 +106,20 @@ func (s *etcdStore) ResignLeader() error {
 	return nil
 }
 
-func (s *etcdStore) WatchLeader() {
+func (s *etcdStore) WatchLeader(rev int64) {
 	watcher := clientv3.NewWatcher(s.client)
 	defer watcher.Close()
 
-	ctx := s.client.Ctx()
+	ctx := clientv3.WithRequireLeader(context.Background())
 	for {
-		rch := watcher.Watch(ctx, s.leaderPath)
+		rch := watcher.Watch(ctx, s.leaderPath, clientv3.WithRev(rev))
 		for wresp := range rch {
+			// meet compacted error, use the compact revision.
+			if wresp.CompactRevision != 0 {
+				rev = wresp.CompactRevision
+				break
+			}
+
 			if wresp.Canceled {
 				return
 			}
@@ -196,12 +202,36 @@ func (s *etcdStore) PutContainer(meta Container) error {
 	return s.save(key, string(data))
 }
 
+func (s *etcdStore) GetResource(id uint64) (Resource, error) {
+	key := s.getKey(id, s.resourcePath)
+	data, _, err := s.getValue(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	res := s.adapter.NewResource()
+	err = res.Unmarshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // GetContainer returns the spec container
 func (s *etcdStore) GetContainer(id uint64) (Container, error) {
 	key := s.getKey(id, s.containerPath)
-	data, err := s.getValue(key)
+	data, _, err := s.getValue(key)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, nil
 	}
 
 	c := s.adapter.NewContainer()
@@ -376,8 +406,45 @@ func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) 
 	return true, nil
 }
 
+func (s *etcdStore) PutIfNotExists(path string, value []byte) (bool, []byte, error) {
+	resp, err := s.txn().
+		If(clientv3.Compare(clientv3.CreateRevision(path), "=", 0)).
+		Then(clientv3.OpPut(path, string(value))).
+		Commit()
+	if err != nil {
+		return false, nil, err
+	}
+
+	if !resp.Succeeded {
+		data, _, err := s.getValue(path)
+		if err != nil {
+			return false, nil, err
+		}
+
+		return false, data, nil
+	}
+
+	return true, nil, nil
+}
+
+func (s *etcdStore) RemoveIfValueMatched(path string, expect []byte) (bool, error) {
+	resp, err := s.txn().
+		If(clientv3.Compare(clientv3.Value(path), "=", string(expect))).
+		Then(clientv3.OpDelete(path)).
+		Commit()
+	if err != nil {
+		return false, err
+	}
+
+	if !resp.Succeeded {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (s *etcdStore) getID() (uint64, error) {
-	resp, err := s.getValue(s.idPath)
+	resp, _, err := s.getValue(s.idPath)
 	if err != nil {
 		return 0, err
 	}
@@ -437,19 +504,19 @@ func (s *etcdStore) leaderCmp(leaderSignature string) clientv3.Cmp {
 	return clientv3.Compare(clientv3.Value(s.leaderPath), "=", leaderSignature)
 }
 
-func (s *etcdStore) getValue(key string, opts ...clientv3.OpOption) ([]byte, error) {
+func (s *etcdStore) getValue(key string, opts ...clientv3.OpOption) ([]byte, int64, error) {
 	resp, err := s.get(key, opts...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if n := len(resp.Kvs); n == 0 {
-		return nil, nil
+		return nil, 0, nil
 	} else if n > 1 {
-		return nil, fmt.Errorf("invalid get value resp %v, must only one", resp.Kvs)
+		return nil, 0, fmt.Errorf("invalid get value resp %v, must only one", resp.Kvs)
 	}
 
-	return resp.Kvs[0].Value, nil
+	return resp.Kvs[0].Value, resp.Kvs[0].ModRevision, nil
 }
 
 func (s *etcdStore) get(key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
@@ -475,7 +542,7 @@ func (s *etcdStore) get(key string, opts ...clientv3.OpOption) (*clientv3.GetRes
 }
 
 func (s *etcdStore) save(key, value string) error {
-	resp, err := s.txn().Then(clientv3.OpPut(key, value)).Commit()
+	resp, err := s.leaderTxn(s.signature).Then(clientv3.OpPut(key, value)).Commit()
 	if err != nil {
 		return err
 	}

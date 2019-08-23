@@ -10,12 +10,13 @@ import (
 type Coordinator struct {
 	sync.RWMutex
 
-	cfg        *Cfg
-	rt         *Runtime
-	checker    *replicaChecker
-	limiter    *scheduleLimiter
-	schedulers map[string]*scheduleController
-	opts       map[uint64]Operator
+	cfg          *Cfg
+	rt           *Runtime
+	scaleChecker *replicaScaleChecker
+	checker      *replicaChecker
+	limiter      *scheduleLimiter
+	schedulers   map[string]*scheduleController
+	opts         map[uint64]Operator
 
 	runner  *Runner
 	tasks   []uint64
@@ -26,6 +27,7 @@ func newCoordinator(cfg *Cfg, runner *Runner, rt *Runtime) *Coordinator {
 	c := new(Coordinator)
 	c.limiter = newScheduleLimiter()
 	c.checker = newReplicaChecker(cfg, rt)
+	c.scaleChecker = newReplicaScaleChecker(rt, cfg.EnableScaleOnNewStore)
 	c.opts = make(map[uint64]Operator)
 	c.schedulers = make(map[string]*scheduleController)
 	c.runner = runner
@@ -171,6 +173,14 @@ func (c *Coordinator) dispatch(target *ResourceRuntime) *resourceHeartbeatRsp {
 	}
 
 	if op := c.checker.Check(target); op != nil {
+		if c.addOperator(op) {
+			res, _ := op.Do(target)
+			return res
+		}
+	}
+
+	// Check scale-out all resources
+	if op := c.scaleChecker.Check(target); op != nil {
 		if c.addOperator(op) {
 			res, _ := op.Do(target)
 			return res
