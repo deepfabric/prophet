@@ -50,7 +50,7 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 	cfg.InitialCluster = c.InitialCluster
 	cfg.ClusterState = c.InitialClusterState
 	cfg.EnablePprof = false
-	cfg.Debug = true
+	cfg.Debug = false
 
 	var err error
 	cfg.LPUrls, err = parseUrls(c.URLsPeer)
