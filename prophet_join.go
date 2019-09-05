@@ -81,7 +81,6 @@ func prepareJoin(cfg *EmbeddedEtcdCfg) error {
 	}
 
 	// joins an existing cluster.
-	log.Infof("join: **********: %s", getStringValue(cfg.URLsAdvertisePeer, cfg.URLsPeer))
 	addResp, err := addEtcdMember(client, strings.Split(getStringValue(cfg.URLsAdvertisePeer, cfg.URLsPeer), ","))
 	if err != nil {
 		return err

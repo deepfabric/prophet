@@ -34,7 +34,7 @@ type elector struct {
 	lessor        clientv3.Lease
 	watchers      map[uint64]clientv3.Watcher
 	watcheCancels map[uint64]context.CancelFunc
-	leasors       map[uint64]clientv3.LeaseID
+	leasors       map[uint64][]clientv3.LeaseID
 }
 
 // NewElector create a elector
@@ -42,7 +42,7 @@ func NewElector(client *clientv3.Client, options ...ElectorOption) (Elector, err
 	e := &elector{
 		client:        client,
 		lessor:        clientv3.NewLease(client),
-		leasors:       make(map[uint64]clientv3.LeaseID),
+		leasors:       make(map[uint64][]clientv3.LeaseID),
 		watcheCancels: make(map[uint64]context.CancelFunc),
 		watchers:      make(map[uint64]clientv3.Watcher),
 	}
@@ -58,7 +58,7 @@ func NewElector(client *clientv3.Client, options ...ElectorOption) (Elector, err
 
 func (e *elector) Stop(group uint64) {
 	e.closeWatcher(group)
-	e.closeLessor(group)
+	e.closeLessor(group, 0)
 }
 
 func (e *elector) CurrentLeader(group uint64) (string, error) {
@@ -70,7 +70,7 @@ func (e *elector) ChangeLeaderTo(group uint64, oldLeader, newLeader string) erro
 	if err != nil {
 		return err
 	}
-	e.closeLessor(group)
+	e.closeLessor(group, 0)
 	return nil
 }
 
@@ -123,7 +123,7 @@ func (e *elector) ElectionLoop(ctx context.Context, group uint64, current string
 			log.Infof("[group-%d]: begin to campaign leader peer %+v",
 				group,
 				current)
-			if err = e.campaignLeader(group, current, becomeLeader, becomeFollower); err != nil {
+			if err = e.campaignLeader(ctx, group, current, becomeLeader, becomeFollower); err != nil {
 				log.Errorf("[group-%d]: campaign leader failure, errors:\n %+v",
 					group,
 					err)
@@ -189,7 +189,7 @@ func (e *elector) watchLeader(group uint64) {
 	}
 }
 
-func (e *elector) campaignLeader(group uint64, leader string, becomeLeader, becomeFollower func()) error {
+func (e *elector) campaignLeader(stopCtx context.Context, group uint64, leader string, becomeLeader, becomeFollower func()) error {
 	// check expect leader exists
 	err := e.checkExpectLeader(group, leader)
 	if err != nil {
@@ -210,8 +210,8 @@ func (e *elector) campaignLeader(group uint64, leader string, becomeLeader, beco
 		return err
 	}
 
-	e.addLessor(group, leaseResp.ID)
-	defer e.closeLessor(group)
+	e.addLessor(ctx, group, leaseResp.ID)
+	defer e.closeLessor(group, leaseResp.ID)
 
 	// The leader key must not exist, so the CreateRevision is 0.
 	resp, err := e.txn().
@@ -279,6 +279,10 @@ func (e *elector) campaignLeader(group uint64, leader string, becomeLeader, beco
 			}
 		case <-e.client.Ctx().Done():
 			return errors.New("server closed")
+		case <-stopCtx.Done():
+			log.Infof("[group-%d]: current node stoppted",
+				group)
+			return nil
 		}
 	}
 }
@@ -335,9 +339,11 @@ func (e *elector) addExpectLeader(group uint64, oldLeader, newLeader string) err
 		return err
 	}
 
-	resp, err := e.leaderTxn(group, oldLeader).Then(clientv3.OpPut(getGroupExpectPath(e.options.leaderPath, group),
-		string(newLeader),
-		clientv3.WithLease(leaseResp.ID))).Commit()
+	resp, err := e.leaderTxn(group, oldLeader).
+		Then(clientv3.OpPut(getGroupExpectPath(e.options.leaderPath, group),
+			string(newLeader),
+			clientv3.WithLease(leaseResp.ID))).
+		Commit()
 	if err != nil {
 		return err
 	}
@@ -353,21 +359,37 @@ func (e *elector) addExpectLeader(group uint64, oldLeader, newLeader string) err
 	return nil
 }
 
-func (e *elector) closeLessor(group uint64) {
+func (e *elector) closeLessor(group uint64, target clientv3.LeaseID) {
 	e.Lock()
 	defer e.Unlock()
 
-	if id, ok := e.leasors[group]; ok {
-		e.lessor.Revoke(e.client.Ctx(), id)
-		delete(e.leasors, group)
+	if ids, ok := e.leasors[group]; ok {
+		var newIds []clientv3.LeaseID
+		for _, id := range ids {
+			if target == 0 || id == target {
+				e.lessor.Revoke(e.client.Ctx(), id)
+				fmt.Printf("***************** lease %d revoked\n", id)
+				continue
+			}
+
+			newIds = append(newIds, id)
+		}
+
+		if len(newIds) == 0 {
+			delete(e.leasors, group)
+		} else {
+			e.leasors[group] = newIds
+		}
 	}
 }
 
-func (e *elector) addLessor(group uint64, id clientv3.LeaseID) {
+func (e *elector) addLessor(ctx context.Context, group uint64, id clientv3.LeaseID) {
 	e.Lock()
 	defer e.Unlock()
 
-	e.leasors[group] = id
+	ids := e.leasors[group]
+	ids = append(ids, id)
+	e.leasors[group] = ids
 }
 
 func (e *elector) getValue(key string, opts ...clientv3.OpOption) ([]byte, error) {
