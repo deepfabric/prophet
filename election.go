@@ -16,15 +16,14 @@ import (
 type Elector interface {
 	// Stop stop elector
 	Stop(group uint64)
-
 	// CurrentLeader returns current leader
 	CurrentLeader(group uint64) (string, error)
-
-	// ElectionLoop run leader election loop
+	// ElectionLoop run leader election loop, if the currentLeader is not set, only watch leader.
 	ElectionLoop(ctx context.Context, group uint64, currentLeader string, becomeLeader, becomeFollower func())
-
-	// ChangeLeaderTo change leader to
+	// ChangeLeaderTo change leader from old to new
 	ChangeLeaderTo(group uint64, oldLeader, newLeader string) error
+	// DoIfLeader do some options and returns false if current node is not leader or some conditions check failed
+	DoIfLeader(group uint64, node string, conditions []clientv3.Cmp, ops ...clientv3.Op) (bool, error)
 }
 
 type elector struct {
@@ -54,6 +53,23 @@ func NewElector(client *clientv3.Client, options ...ElectorOption) (Elector, err
 	e.options.adjust()
 
 	return e, nil
+}
+
+func (e *elector) DoIfLeader(group uint64, node string, conditions []clientv3.Cmp, ops ...clientv3.Op) (bool, error) {
+	if len(ops) == 0 {
+		return true, nil
+	}
+
+	resp, err := e.leaderTxn(group, node, conditions...).Then(ops...).Commit()
+	if err != nil {
+		return false, err
+	}
+
+	if !resp.Succeeded {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (e *elector) Stop(group uint64) {
@@ -94,7 +110,7 @@ func (e *elector) ElectionLoop(ctx context.Context, group uint64, current string
 				leader)
 
 			if len(leader) > 0 {
-				if leader == current {
+				if current != "" && leader == current {
 					// oh, we are already leader, we may meet something wrong
 					// in previous campaignLeader. we can resign and campaign again.
 					log.Warnf("[group-%d]: leader is matched, resign and campaign again, leader %+v",
@@ -120,14 +136,16 @@ func (e *elector) ElectionLoop(ctx context.Context, group uint64, current string
 				}
 			}
 
-			log.Infof("[group-%d]: begin to campaign leader peer %+v",
-				group,
-				current)
-			if err = e.campaignLeader(ctx, group, current, becomeLeader, becomeFollower); err != nil {
-				log.Errorf("[group-%d]: campaign leader failure, errors:\n %+v",
+			if current != "" {
+				log.Infof("[group-%d]: begin to campaign leader peer %+v",
 					group,
-					err)
-				time.Sleep(time.Second * time.Duration(e.options.leaseSec))
+					current)
+				if err = e.campaignLeader(ctx, group, current, becomeLeader, becomeFollower); err != nil {
+					log.Errorf("[group-%d]: campaign leader failure, errors:\n %+v",
+						group,
+						err)
+					time.Sleep(time.Second * time.Duration(e.options.leaseSec))
+				}
 			}
 		}
 	}
@@ -368,7 +386,6 @@ func (e *elector) closeLessor(group uint64, target clientv3.LeaseID) {
 		for _, id := range ids {
 			if target == 0 || id == target {
 				e.lessor.Revoke(e.client.Ctx(), id)
-				fmt.Printf("***************** lease %d revoked\n", id)
 				continue
 			}
 

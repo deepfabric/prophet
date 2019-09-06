@@ -1,9 +1,7 @@
 package prophet
 
 import (
-	"fmt"
 	stdLog "log"
-	"os"
 )
 
 var (
@@ -35,12 +33,10 @@ func (l *emptyLog) Warnf(format string, v ...interface{})  {}
 func (l *emptyLog) Error(v ...interface{})                 {}
 func (l *emptyLog) Errorf(format string, v ...interface{}) {}
 func (l *emptyLog) Fatal(v ...interface{}) {
-	stdLog.Output(4, fmt.Sprintln(v...))
-	os.Exit(-1)
+	stdLog.Panic(v...)
 }
 func (l *emptyLog) Fatalf(format string, v ...interface{}) {
-	stdLog.Output(4, fmt.Sprintf(format, v...))
-	os.Exit(-1)
+	stdLog.Panicf(format, v...)
 }
 
 func init() {

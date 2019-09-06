@@ -2,15 +2,15 @@ package prophet
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"sync"
 	"time"
 
+	"github.com/fagongzi/goetty"
+
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/fagongzi/util/format"
 )
 
@@ -50,144 +50,28 @@ type etcdStore struct {
 	adapter       Adapter
 	client        *clientv3.Client
 	idPath        string
-	leaderPath    string
 	resourcePath  string
 	containerPath string
 	clusterPath   string
 
-	store     Store
+	store Store
+	base  uint64
+	end   uint64
+
 	signature string
-	base      uint64
-	end       uint64
+	elector   Elector
 }
 
-func newEtcdStore(client *clientv3.Client, adapter Adapter, signature string) Store {
+func newEtcdStore(client *clientv3.Client, adapter Adapter, signature string, elector Elector) Store {
 	return &etcdStore{
 		adapter:       adapter,
 		client:        client,
 		signature:     signature,
+		elector:       elector,
 		idPath:        "/meta/id",
-		leaderPath:    "/meta/leader",
 		resourcePath:  "/meta/resources",
 		containerPath: "/meta/containers",
 		clusterPath:   "/cluster",
-	}
-}
-
-func (s *etcdStore) GetCurrentLeader() (*Node, int64, error) {
-	resp, rev, err := s.getValue(s.leaderPath)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if nil == resp {
-		return nil, 0, nil
-	}
-
-	v := &Node{}
-	err = json.Unmarshal(resp, v)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return v, rev, nil
-}
-
-func (s *etcdStore) ResignLeader() error {
-	resp, err := s.leaderTxn(s.signature).Then(clientv3.OpDelete(s.leaderPath)).Commit()
-	if err != nil {
-		return err
-	}
-
-	if !resp.Succeeded {
-		return errors.New("resign leader failed, we are not leader already")
-	}
-
-	return nil
-}
-
-func (s *etcdStore) WatchLeader(rev int64) {
-	watcher := clientv3.NewWatcher(s.client)
-	defer watcher.Close()
-
-	ctx := clientv3.WithRequireLeader(context.Background())
-	for {
-		rch := watcher.Watch(ctx, s.leaderPath, clientv3.WithRev(rev))
-		for wresp := range rch {
-			// meet compacted error, use the compact revision.
-			if wresp.CompactRevision != 0 {
-				rev = wresp.CompactRevision
-				break
-			}
-
-			if wresp.Canceled {
-				return
-			}
-
-			for _, ev := range wresp.Events {
-				if ev.Type == mvccpb.DELETE {
-					return
-				}
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			// server closed, return
-			return
-		default:
-		}
-	}
-}
-
-func (s *etcdStore) CampaignLeader(leaderLeaseTTL int64, enableLeaderFun, disableLeaderFun func()) error {
-	lessor := clientv3.NewLease(s.client)
-	defer lessor.Close()
-
-	start := time.Now()
-	ctx, cancel := context.WithTimeout(s.client.Ctx(), DefaultRequestTimeout)
-	leaseResp, err := lessor.Grant(ctx, leaderLeaseTTL)
-	cancel()
-
-	if cost := time.Now().Sub(start); cost > DefaultSlowRequestTime {
-		log.Warnf("prophet: lessor grants too slow, cost=<%s>", cost)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// The leader key must not exist, so the CreateRevision is 0.
-	resp, err := s.txn().
-		If(clientv3.Compare(clientv3.CreateRevision(s.leaderPath), "=", 0)).
-		Then(clientv3.OpPut(s.leaderPath, s.signature, clientv3.WithLease(clientv3.LeaseID(leaseResp.ID)))).
-		Commit()
-	if err != nil {
-		return err
-	}
-	if !resp.Succeeded {
-		return errors.New("campaign leader failed, other server may campaign ok")
-	}
-
-	// Make the leader keepalived.
-	ch, err := lessor.KeepAlive(s.client.Ctx(), clientv3.LeaseID(leaseResp.ID))
-	if err != nil {
-		return err
-	}
-
-	enableLeaderFun()
-	defer disableLeaderFun()
-
-	for {
-		select {
-		case _, ok := <-ch:
-			if !ok {
-				log.Info("prophet: channel that keep alive for leader lease is closed")
-				return nil
-			}
-		case <-s.client.Ctx().Done():
-			return errors.New("server closed")
-		}
 	}
 }
 
@@ -367,11 +251,17 @@ func (s *etcdStore) generate() (uint64, error) {
 
 // PutBootstrapped put cluster is bootstrapped
 func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) (bool, error) {
+	clusterID, err := s.AllocID()
+	if err != nil {
+		return false, err
+	}
+
 	ctx, cancel := context.WithTimeout(s.client.Ctx(), DefaultTimeout)
 	defer cancel()
 
 	// build operations
 	var ops []clientv3.Op
+	ops = append(ops, clientv3.OpPut(s.clusterPath, string(goetty.Uint64ToBytes(clusterID))))
 
 	meta, err := container.Marshal()
 	if err != nil {
@@ -385,7 +275,6 @@ func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) 
 			return false, err
 		}
 		ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
-		ops = append(ops, clientv3.OpPut(s.clusterPath, string(meta)))
 	}
 
 	// txn
@@ -459,13 +348,13 @@ func (s *etcdStore) getID() (uint64, error) {
 func (s *etcdStore) createID(leaderSignature string, value uint64) error {
 	cmp := clientv3.Compare(clientv3.CreateRevision(s.idPath), "=", 0)
 	op := clientv3.OpPut(s.idPath, string(format.Uint64ToBytes(value)))
-	resp, err := s.leaderTxn(leaderSignature, cmp).Then(op).Commit()
 
+	ok, err := s.elector.DoIfLeader(math.MaxUint64, leaderSignature, []clientv3.Cmp{cmp}, op)
 	if err != nil {
 		return err
 	}
 
-	if !resp.Succeeded {
+	if !ok {
 		return errMaybeNotLeader
 	}
 
@@ -475,13 +364,13 @@ func (s *etcdStore) createID(leaderSignature string, value uint64) error {
 func (s *etcdStore) updateID(leaderSignature string, old, value uint64) error {
 	cmp := clientv3.Compare(clientv3.Value(s.idPath), "=", string(format.Uint64ToBytes(old)))
 	op := clientv3.OpPut(s.idPath, string(format.Uint64ToBytes(value)))
-	resp, err := s.leaderTxn(leaderSignature, cmp).Then(op).Commit()
 
+	ok, err := s.elector.DoIfLeader(math.MaxUint64, leaderSignature, []clientv3.Cmp{cmp}, op)
 	if err != nil {
 		return err
 	}
 
-	if !resp.Succeeded {
+	if !ok {
 		return errMaybeNotLeader
 	}
 
@@ -494,14 +383,6 @@ func (s *etcdStore) getKey(id uint64, base string) string {
 
 func (s *etcdStore) txn() clientv3.Txn {
 	return newSlowLogTxn(s.client)
-}
-
-func (s *etcdStore) leaderTxn(leaderSignature string, cs ...clientv3.Cmp) clientv3.Txn {
-	return newSlowLogTxn(s.client).If(append(cs, s.leaderCmp(leaderSignature))...)
-}
-
-func (s *etcdStore) leaderCmp(leaderSignature string) clientv3.Cmp {
-	return clientv3.Compare(clientv3.Value(s.leaderPath), "=", leaderSignature)
 }
 
 func (s *etcdStore) getValue(key string, opts ...clientv3.OpOption) ([]byte, int64, error) {
@@ -542,12 +423,12 @@ func (s *etcdStore) get(key string, opts ...clientv3.OpOption) (*clientv3.GetRes
 }
 
 func (s *etcdStore) save(key, value string) error {
-	resp, err := s.leaderTxn(s.signature).Then(clientv3.OpPut(key, value)).Commit()
+	ok, err := s.elector.DoIfLeader(math.MaxUint64, s.signature, nil, clientv3.OpPut(key, value))
 	if err != nil {
 		return err
 	}
 
-	if !resp.Succeeded {
+	if !ok {
 		return errTxnFailed
 	}
 
@@ -556,19 +437,6 @@ func (s *etcdStore) save(key, value string) error {
 
 func (s *etcdStore) create(key, value string) error {
 	resp, err := s.txn().If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).Then(clientv3.OpPut(key, value)).Commit()
-	if err != nil {
-		return err
-	}
-
-	if !resp.Succeeded {
-		return errTxnFailed
-	}
-
-	return nil
-}
-
-func (s *etcdStore) delete(key string, opts ...clientv3.OpOption) error {
-	resp, err := s.txn().Then(clientv3.OpDelete(key, opts...)).Commit()
 	if err != nil {
 		return err
 	}

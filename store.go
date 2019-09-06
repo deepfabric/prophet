@@ -2,18 +2,6 @@ package prophet
 
 // Store meta store
 type Store interface {
-	// CampaignLeader is for leader election
-	// if we are win the leader election, the enableLeaderFun will call
-	CampaignLeader(ttl int64, enableLeaderFun, disableLeaderFun func()) error
-	// ResignLeader delete leader itself and let others start a new election again.
-	ResignLeader() error
-	// GetCurrentLeader return current leader
-	GetCurrentLeader() (*Node, int64, error)
-	// WatchLeader watch leader,
-	// this funcation will return unitl the leader's lease is timeout
-	// or server closed
-	WatchLeader(int64)
-
 	// PutResource puts the meta to the store
 	PutResource(meta Resource) error
 	// GetResource returns the spec resource

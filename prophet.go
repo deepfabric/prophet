@@ -54,18 +54,23 @@ type defaultProphet struct {
 	store       Store
 	rt          *Runtime
 	coordinator *Coordinator
-	node        *Node
-	leader      *Node
-	leaderFlag  int64
-	signature   string
-	tcpL        *goetty.Server
-	runner      *Runner
-	completeC   chan struct{}
-	rpc         *simpleRPC
-	bizCodec    *codec
+
+	tcpL      *goetty.Server
+	runner    *Runner
+	completeC chan struct{}
+	rpc       *simpleRPC
+	bizCodec  *codec
 
 	wn          *watcherNotifier
 	resourceHBC chan uint64
+
+	// about leader election
+	node       *Node
+	elector    Elector
+	leader     *Node
+	leaderFlag int64
+	signature  string
+	notifyOnce sync.Once
 }
 
 // NewProphet returns a prophet instance
@@ -87,7 +92,8 @@ func NewProphet(name string, adapter Adapter, opts ...Option) Prophet {
 		Addr: p.cfg.RPCAddr,
 	}
 	p.signature = p.node.marshal()
-	p.store = newEtcdStore(value.client, adapter, p.signature)
+	p.elector, _ = NewElector(p.opts.client, WithLeaderLeaseSeconds(p.opts.cfg.LeaseTTL))
+	p.store = newEtcdStore(value.client, adapter, p.signature, p.elector)
 	p.runner = NewRunner()
 	p.coordinator = newCoordinator(value.cfg, p.runner, p.rt)
 	p.tcpL = goetty.NewServer(p.cfg.RPCAddr,
