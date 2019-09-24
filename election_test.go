@@ -90,8 +90,10 @@ func (t *electorTester) notifyStarted() {
 }
 
 func TestElectionLoop(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -103,17 +105,24 @@ func TestElectionLoop(t *testing.T) {
 
 	elector, err := NewElector(client, WithLeaderLeaseSeconds(1))
 	assert.Nil(t, err, "create elector failed")
+	defer elector.Stop(0)
 
 	value1 := newElectorTester(0, "1", elector)
-	value1.start()
-	assert.True(t, value1.isLeader(), "value1 must be leader")
-
 	value2 := newElectorTester(0, "2", elector)
+
+	value1.start()
 	value2.start()
+
+	defer value1.stop(0)
+	defer value2.stop(0)
+
+	assert.True(t, value1.isLeader(), "value1 must be leader")
 	assert.False(t, value2.isLeader(), "value2 must be follower")
 
 	value3 := newElectorTester(0, "", elector)
 	value3.start()
+	defer value3.stop(0)
+
 	assert.False(t, value3.isLeader(), "value3 must be follower")
 
 	value1.stop(0)
@@ -127,8 +136,10 @@ func TestElectionLoop(t *testing.T) {
 }
 
 func TestElectionLoopWithDistributedLock(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -142,26 +153,33 @@ func TestElectionLoopWithDistributedLock(t *testing.T) {
 		WithLeaderLeaseSeconds(1),
 		WithLockIfBecomeLeader(true))
 	assert.Nil(t, err, "create elector failed")
+	defer elector.Stop(0)
 
 	value1 := newElectorTester(0, "1", elector)
-	value1.start()
-	assert.True(t, value1.isLeader(), "value1 must be leader")
-
 	value2 := newElectorTester(0, "2", elector)
+
+	value1.start()
 	value2.start()
+
+	defer value1.stop(0)
+	defer value2.stop(0)
+
+	assert.True(t, value1.isLeader(), "value1 must be leader")
 	assert.False(t, value2.isLeader(), "value2 must be follower")
 
 	value1.stop(time.Second * 2)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second + time.Millisecond*200)
 	assert.False(t, value2.isLeader(), "value2 must be follower before distributed lock released")
 
-	time.Sleep(time.Second + time.Millisecond*100)
+	time.Sleep(time.Second + time.Millisecond*200)
 	assert.True(t, value2.isLeader(), "value2 must be leader after distributed lock released")
 }
 
 func TestChangeLeaderTo(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -174,12 +192,16 @@ func TestChangeLeaderTo(t *testing.T) {
 	elector, err := NewElector(client,
 		WithLeaderLeaseSeconds(1))
 	assert.Nil(t, err, "create elector failed")
+	defer elector.Stop(0)
 
 	value1 := newElectorTester(0, "1", elector)
 	value2 := newElectorTester(0, "2", elector)
 
 	value1.start()
 	value2.start()
+
+	defer value1.stop(0)
+	defer value2.stop(0)
 
 	err = elector.ChangeLeaderTo(0, "2", "3")
 	assert.NotNil(t, err, "only leader node can transfer leader")
@@ -187,14 +209,16 @@ func TestChangeLeaderTo(t *testing.T) {
 	err = elector.ChangeLeaderTo(0, "1", "2")
 	assert.Nil(t, err, "change leader failed")
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second + time.Millisecond*200)
 	assert.False(t, value1.isLeader(), "value1 must be follower")
 	assert.True(t, value2.isLeader(), "value2 must be leader")
 }
 
 func TestCurrentLeader(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -207,12 +231,16 @@ func TestCurrentLeader(t *testing.T) {
 	elector, err := NewElector(client,
 		WithLeaderLeaseSeconds(1))
 	assert.Nil(t, err, "create elector failed")
+	defer elector.Stop(0)
 
 	value1 := newElectorTester(0, "1", elector)
 	value2 := newElectorTester(0, "2", elector)
 
 	value1.start()
 	value2.start()
+
+	defer value1.stop(0)
+	defer value2.stop(0)
 
 	data, err := elector.CurrentLeader(0)
 	assert.Nil(t, err, "get current leader failed")
@@ -221,15 +249,17 @@ func TestCurrentLeader(t *testing.T) {
 	elector.ChangeLeaderTo(0, "1", "2")
 	assert.Nil(t, err, "get current leader failed")
 
-	time.Sleep(time.Second*1 + time.Millisecond*200)
+	time.Sleep(time.Second + time.Millisecond*200)
 	data, err = elector.CurrentLeader(0)
 	assert.Nil(t, err, "get current leader failed")
 	assert.Equalf(t, "2", string(data), "current leader failed, %+v", value2.isLeader())
 }
 
 func TestStop(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -239,25 +269,31 @@ func TestStop(t *testing.T) {
 	assert.Nil(t, err, "create etcd client failed")
 	defer client.Close()
 
-	elector, err := NewElector(client,
+	e, err := NewElector(client,
 		WithLeaderLeaseSeconds(1))
 	assert.Nil(t, err, "create elector failed")
+	defer e.Stop(0)
 
-	value1 := newElectorTester(0, "1", elector)
-	value2 := newElectorTester(0, "2", elector)
+	value1 := newElectorTester(0, "1", e)
+	value2 := newElectorTester(0, "2", e)
 
 	value1.start()
 	value2.start()
 
-	elector.Stop(0)
+	defer value1.stop(0)
+	defer value2.stop(0)
 
-	time.Sleep(time.Second + time.Microsecond*200)
-	assert.False(t, value1.isLeader(), "value1 must be follower")
+	e.Stop(0)
+
+	assert.Equal(t, 0, len(e.(*elector).watchers), "watchers must be clear")
+	assert.Equal(t, 0, len(e.(*elector).leasors), "leasors must be clear")
 }
 
 func TestDoIfLeader(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -276,6 +312,9 @@ func TestDoIfLeader(t *testing.T) {
 
 	value1.start()
 	value2.start()
+
+	defer value1.stop(0)
+	defer value2.stop(0)
 
 	ok, err := elector.DoIfLeader(0, "1", nil, clientv3.OpPut("/key1", "value1"))
 	assert.Nil(t, err, "check do if leader failed")

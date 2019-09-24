@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
@@ -17,14 +18,23 @@ import (
 )
 
 var (
-	ports uint64 = 10000
+	mutex sync.Mutex
+	ports = 10000
 )
 
-func startTestSingleEtcd() (chan interface{}, int, error) {
-	port := atomic.AddUint64(&ports, 1)
-	peerPort := atomic.AddUint64(&ports, 1)
+func nextTestPorts() int {
+	mutex.Lock()
+	defer mutex.Unlock()
 
-	now := time.Now().Unix()
+	ports++
+	return ports
+}
+
+func startTestSingleEtcd(t *testing.T) (chan interface{}, int, error) {
+	port := nextTestPorts()
+	peerPort := nextTestPorts()
+
+	now := time.Now().UnixNano()
 
 	cfg := embed.NewConfig()
 	cfg.Name = "p1"
@@ -46,6 +56,7 @@ func startTestSingleEtcd() (chan interface{}, int, error) {
 
 	select {
 	case <-etcd.Server.ReadyNotify():
+		time.Sleep(time.Millisecond * 100)
 		stopC := make(chan interface{})
 		go func() {
 			<-stopC
@@ -53,7 +64,7 @@ func startTestSingleEtcd() (chan interface{}, int, error) {
 			os.RemoveAll(cfg.Dir)
 		}()
 
-		return stopC, int(port), nil
+		return stopC, port, nil
 	case <-time.After(time.Minute * 5):
 		return nil, 0, errors.New("start embed etcd timeout")
 	}
@@ -277,5 +288,18 @@ func newTestAdapter(ctrl *gomock.Controller) Adapter {
 	value := NewMockAdapter(ctrl)
 	value.EXPECT().NewContainer().AnyTimes().DoAndReturn(newTestContainer)
 	value.EXPECT().NewResource().AnyTimes().DoAndReturn(newTestResource)
+	return value
+}
+
+func newTestResourceStore(ctrl *gomock.Controller, meta Container) ResourceStore {
+	value := NewMockResourceStore(ctrl)
+	value.EXPECT().Meta().AnyTimes().Return(meta)
+	return value
+}
+
+func newTestPeerReplicaHandler(ctrl *gomock.Controller) PeerReplicaHandler {
+	value := NewMockPeerReplicaHandler(ctrl)
+	value.EXPECT().ResourceBecomeLeader(gomock.Any()).AnyTimes()
+	value.EXPECT().ResourceBecomeFollower(gomock.Any()).AnyTimes()
 	return value
 }

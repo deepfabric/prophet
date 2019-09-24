@@ -5,9 +5,8 @@
 package prophet
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockSerializable is a mock of Serializable interface

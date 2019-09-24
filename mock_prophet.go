@@ -5,11 +5,10 @@
 package prophet
 
 import (
-	reflect "reflect"
-	time "time"
-
 	clientv3 "github.com/coreos/etcd/clientv3"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
+	time "time"
 )
 
 // MockRoleChangeHandler is a mock of RoleChangeHandler interface

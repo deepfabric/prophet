@@ -24,17 +24,41 @@ type Logger interface {
 
 type emptyLog struct{}
 
-func (l *emptyLog) Info(v ...interface{})                  {}
-func (l *emptyLog) Infof(format string, v ...interface{})  {}
-func (l *emptyLog) Debug(v ...interface{})                 {}
-func (l *emptyLog) Debugf(format string, v ...interface{}) {}
-func (l *emptyLog) Warn(v ...interface{})                  {}
-func (l *emptyLog) Warnf(format string, v ...interface{})  {}
-func (l *emptyLog) Error(v ...interface{})                 {}
-func (l *emptyLog) Errorf(format string, v ...interface{}) {}
+func (l *emptyLog) Info(v ...interface{}) {
+	stdLog.Print(v...)
+}
+
+func (l *emptyLog) Infof(format string, v ...interface{}) {
+	stdLog.Printf(format, v...)
+}
+func (l *emptyLog) Debug(v ...interface{}) {
+	stdLog.Print(v...)
+}
+
+func (l *emptyLog) Debugf(format string, v ...interface{}) {
+	stdLog.Printf(format, v...)
+}
+
+func (l *emptyLog) Warn(v ...interface{}) {
+	stdLog.Print(v...)
+}
+
+func (l *emptyLog) Warnf(format string, v ...interface{}) {
+	stdLog.Printf(format, v...)
+}
+
+func (l *emptyLog) Error(v ...interface{}) {
+	stdLog.Print(v...)
+}
+
+func (l *emptyLog) Errorf(format string, v ...interface{}) {
+	stdLog.Printf(format, v...)
+}
+
 func (l *emptyLog) Fatal(v ...interface{}) {
 	stdLog.Panic(v...)
 }
+
 func (l *emptyLog) Fatalf(format string, v ...interface{}) {
 	stdLog.Panicf(format, v...)
 }

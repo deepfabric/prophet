@@ -113,8 +113,10 @@ func TestRange(t *testing.T) {
 }
 
 func TestBootstrapCluster(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -128,7 +130,9 @@ func TestBootstrapCluster(t *testing.T) {
 	defer ctrl.Finish()
 
 	elector, _ := NewElector(client)
-	newElectorTester(math.MaxUint64, "c1", elector).start()
+	et := newElectorTester(math.MaxUint64, "c1", elector)
+	et.start()
+	defer et.stop(0)
 
 	rpc := newTestRPC(ctrl, 0)
 	pd := newTestProphet(ctrl, newEtcdStore(client, newTestAdapter(ctrl), "c1", elector), rpc, client, func() {})
@@ -171,8 +175,10 @@ func TestBootstrapCluster(t *testing.T) {
 }
 
 func TestMustPutResource(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -186,7 +192,9 @@ func TestMustPutResource(t *testing.T) {
 	defer ctrl.Finish()
 
 	elector, _ := NewElector(client)
-	newElectorTester(math.MaxUint64, "c1", elector).start()
+	et := newElectorTester(math.MaxUint64, "c1", elector)
+	et.start()
+	defer et.stop(0)
 
 	rpc := newTestRPC(ctrl, 0)
 	pd := newTestProphet(ctrl, newEtcdStore(client, newTestAdapter(ctrl), "c1", elector), rpc, client, func() {})
@@ -214,8 +222,10 @@ func TestMustPutResource(t *testing.T) {
 }
 
 func TestMustRemoveResource(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -229,7 +239,9 @@ func TestMustRemoveResource(t *testing.T) {
 	defer ctrl.Finish()
 
 	elector, _ := NewElector(client)
-	newElectorTester(math.MaxUint64, "c1", elector).start()
+	et := newElectorTester(math.MaxUint64, "c1", elector)
+	et.start()
+	defer et.stop(0)
 
 	rpc := newTestRPC(ctrl, 0)
 	pd := newTestProphet(ctrl, newEtcdStore(client, newTestAdapter(ctrl), "c1", elector), rpc, client, func() {})
@@ -253,9 +265,11 @@ func TestMustRemoveResource(t *testing.T) {
 	assert.Equal(t, 0, store.MustCountResources(), "remove resource failed")
 }
 
-func TestMustAllocIDe(t *testing.T) {
-	stopC, port, err := startTestSingleEtcd()
-	assert.Nil(t, err, "start embed etcd failed")
+func TestMustAllocID(t *testing.T) {
+	stopC, port, err := startTestSingleEtcd(t)
+	if err != nil {
+		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
+	}
 	defer close(stopC)
 
 	client, err := clientv3.New(clientv3.Config{
@@ -269,7 +283,9 @@ func TestMustAllocIDe(t *testing.T) {
 	defer ctrl.Finish()
 
 	elector, _ := NewElector(client)
-	newElectorTester(math.MaxUint64, "c1", elector).start()
+	et := newElectorTester(math.MaxUint64, "c1", elector)
+	et.start()
+	defer et.stop(0)
 
 	rpc := newTestRPC(ctrl, 0)
 	pd := newTestProphet(ctrl, newEtcdStore(client, newTestAdapter(ctrl), "c1", elector), rpc, client, func() {})

@@ -147,6 +147,8 @@ func (e *elector) ElectionLoop(ctx context.Context, group uint64, current string
 					time.Sleep(time.Second * time.Duration(e.options.leaseSec))
 				}
 			}
+
+			time.Sleep(loopInterval)
 		}
 	}
 }

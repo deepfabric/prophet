@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	loopInterval = 200 * time.Millisecond
+	loopInterval = 100 * time.Millisecond
 )
 
 // Node is prophet info
