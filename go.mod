@@ -1,4 +1,4 @@
-module github.com/infinivision/prophet
+module github.com/deepfabric/prophet
 
 go 1.12
 
