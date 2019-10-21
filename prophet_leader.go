@@ -39,7 +39,7 @@ func (p *defaultProphet) startLeaderLoop() {
 		leaderSignature = p.signature
 	}
 
-	p.elector.ElectionLoop(context.Background(),
+	go p.elector.ElectionLoop(context.Background(),
 		math.MaxUint64,
 		leaderSignature,
 		p.enableLeader,
