@@ -28,6 +28,11 @@ func (r *replicaChecker) Check(target *ResourceRuntime) Operator {
 	}
 
 	currReplicasCount := len(target.meta.Peers())
+	log.Debugf("prophet: dispatch resource %d hit replica checker, expect %d, current %d",
+		target.meta.ID(),
+		currReplicasCount,
+		r.cfg.CountResourceReplicas)
+
 	if currReplicasCount < r.cfg.CountResourceReplicas {
 		newPeer, _ := r.selectBestPeer(target, true, r.filters...)
 		if newPeer == nil {
@@ -38,6 +43,11 @@ func (r *replicaChecker) Check(target *ResourceRuntime) Operator {
 	}
 
 	if currReplicasCount > r.cfg.CountResourceReplicas {
+		log.Debugf("prophet: dispatch resource %d has more replica, expect %d, current %d",
+			target.meta.ID(),
+			currReplicasCount,
+			r.cfg.CountResourceReplicas)
+
 		oldPeer, _ := r.selectWorstPeer(target)
 		if oldPeer == nil {
 			return nil

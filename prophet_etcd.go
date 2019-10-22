@@ -166,7 +166,7 @@ func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *Embe
 				eps = append(eps, m.GetClientURLs()...)
 			}
 			client.SetEndpoints(eps...)
-			log.Infof("prophet: etcd client endpoints set to %+v", eps)
+			log.Debugf("prophet: etcd client endpoints set to %+v", eps)
 
 			time.Sleep(time.Second * 10)
 		}

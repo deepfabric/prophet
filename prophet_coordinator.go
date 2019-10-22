@@ -158,6 +158,10 @@ func (c *Coordinator) runScheduler(ctx context.Context, s *scheduleController) {
 // dispatch is used for coordinator resource,
 // it will coordinator when the heartbeat arrives
 func (c *Coordinator) dispatch(target *ResourceRuntime) *resourceHeartbeatRsp {
+	log.Debugf("prophet: dispatch resource %d,  %+v",
+		target.meta.ID(),
+		target.meta)
+
 	// Check existed operator.
 	if op := c.getOperator(target.meta.ID()); op != nil {
 		res, finished := op.Do(target)

@@ -76,6 +76,8 @@ func (p *defaultProphet) doResourceHeartbeatLoop() {
 					break
 				}
 
+				log.Debugf("prophet: read rpc response (%T)%+v", msg, msg)
+
 				if rsp, ok := msg.(*errorRsp); ok {
 					conn.Close()
 					conn = nil
