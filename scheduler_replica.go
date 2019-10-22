@@ -142,6 +142,10 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 	// Select the container with best distinct score.
 	// If the scores are the same, select the container with minimal replica score.
 	containers := r.rt.ResourceContainers(target)
+	log.Debugf("prophet: resource %d select best peer using %d containers",
+		target.meta.ID(),
+		len(containers))
+
 	for _, container := range r.rt.Containers() {
 		if filterTarget(container, filters) {
 			log.Debugf("prophet: resource %d select best peer skip container %d",

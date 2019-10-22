@@ -199,7 +199,12 @@ func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 		for _, res := range initResources {
 			ls.MustRemoveResource(res.ID())
 		}
-		log.Fatal("bootstrap cluster failed with %+v", err)
+
+		if err != errMaybeNotLeader {
+			log.Fatal("bootstrap cluster failed with %+v", err)
+		}
+
+		log.Warnf("bootstrap cluster failed with %+v", err)
 	}
 	if !ok {
 		log.Info("the cluster is already bootstrapped")
