@@ -144,6 +144,9 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 	containers := r.rt.ResourceContainers(target)
 	for _, container := range r.rt.Containers() {
 		if filterTarget(container, filters) {
+			log.Debugf("prophet: resource %d select best peer skip container %d",
+				target.meta.ID(),
+				container.meta.ID())
 			continue
 		}
 
@@ -155,8 +158,17 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 	}
 
 	if bestContainer == nil || filterTarget(bestContainer, r.filters) {
+		if bestContainer != nil {
+			log.Debugf("prophet: resource %d select best peer skip best container %d",
+				target.meta.ID(),
+				bestContainer.meta.ID())
+		}
 		return nil, 0
 	}
+
+	log.Debugf("prophet: resource %d select best peer use container %d",
+		target.meta.ID(),
+		bestContainer.meta.ID())
 
 	newPeer, err := allocPeer(bestContainer.meta.ID(), r.rt.p.store, allocPeerID)
 	if err != nil {
