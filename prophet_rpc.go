@@ -77,7 +77,7 @@ func (rpc *simpleRPC) AllocID() (uint64, error) {
 
 			if rsp, ok := value.(*allocIDRsp); ok {
 				if rpc.notLeaderErr(rsp.Err) {
-					log.Warnf("prophet: alloc id failed with not leader, retry")
+					log.Warningf("prophet: alloc id failed with not leader, retry")
 					rpc.wait(conn)
 					break
 				}
@@ -115,7 +115,7 @@ func (rpc *simpleRPC) AskSplit(res Resource) (uint64, []uint64, error) {
 
 			if rsp, ok := value.(*askSplitRsp); ok {
 				if rpc.notLeaderErr(rsp.Err) {
-					log.Warnf("prophet: ask split failed with not leader, retry")
+					log.Warningf("prophet: ask split failed with not leader, retry")
 					rpc.wait(conn)
 					break
 				}

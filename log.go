@@ -14,8 +14,8 @@ type Logger interface {
 	Infof(format string, v ...interface{})
 	Debug(v ...interface{})
 	Debugf(format string, v ...interface{})
-	Warn(v ...interface{})
-	Warnf(format string, v ...interface{})
+	Warning(v ...interface{})
+	Warningf(format string, v ...interface{})
 	Error(v ...interface{})
 	Errorf(format string, v ...interface{})
 	Fatal(v ...interface{})
@@ -39,11 +39,11 @@ func (l *emptyLog) Debugf(format string, v ...interface{}) {
 	stdLog.Printf(format, v...)
 }
 
-func (l *emptyLog) Warn(v ...interface{}) {
+func (l *emptyLog) Warning(v ...interface{}) {
 	stdLog.Print(v...)
 }
 
-func (l *emptyLog) Warnf(format string, v ...interface{}) {
+func (l *emptyLog) Warningf(format string, v ...interface{}) {
 	stdLog.Printf(format, v...)
 }
 

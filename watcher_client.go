@@ -138,7 +138,7 @@ func (w *Watcher) startReadLoop() {
 			log.Infof("%d, %d", expectSeq, evt.Seq)
 			// we lost some event notify, close the conection, and retry
 			if expectSeq != evt.Seq {
-				log.Warnf("prophet: watch lost some event notify, expect seq %d, but %d, close and retry",
+				log.Warningf("prophet: watch lost some event notify, expect seq %d, but %d, close and retry",
 					expectSeq,
 					evt.Seq)
 				w.conn.Close()

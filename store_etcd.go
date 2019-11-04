@@ -411,7 +411,7 @@ func (s *etcdStore) get(key string, opts ...clientv3.OpOption) (*clientv3.GetRes
 	}
 
 	if cost := time.Since(start); cost > DefaultSlowRequestTime {
-		log.Warnf("prophet: read option is too slow, key=<%s>, cost=<%d>",
+		log.Warningf("prophet: read option is too slow, key=<%s>, cost=<%d>",
 			key,
 			cost)
 	}

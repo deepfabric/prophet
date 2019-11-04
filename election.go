@@ -113,11 +113,11 @@ func (e *elector) ElectionLoop(ctx context.Context, group uint64, current string
 				if current != "" && leader == current {
 					// oh, we are already leader, we may meet something wrong
 					// in previous campaignLeader. we can resign and campaign again.
-					log.Warnf("[group-%d]: leader is matched, resign and campaign again, leader %+v",
+					log.Warningf("[group-%d]: leader is matched, resign and campaign again, leader %+v",
 						group,
 						leader)
 					if err = e.resignLeader(group, current); err != nil {
-						log.Warnf("[group-%d]: resign leader failure, leader peer %+v, errors:\n %+v",
+						log.Warningf("[group-%d]: resign leader failure, leader peer %+v, errors:\n %+v",
 							group,
 							leader,
 							err)
@@ -224,7 +224,7 @@ func (e *elector) campaignLeader(stopCtx context.Context, group uint64, leader s
 	cancel()
 
 	if cost := time.Now().Sub(start); cost > DefaultSlowRequestTime {
-		log.Warnf("lessor grants too slow, cost=<%s>", cost)
+		log.Warningf("lessor grants too slow, cost=<%s>", cost)
 	}
 	if err != nil {
 		return err
@@ -440,7 +440,7 @@ func (e *elector) get(key string, opts ...clientv3.OpOption) (*clientv3.GetRespo
 	}
 
 	if cost := time.Since(start); cost > DefaultSlowRequestTime {
-		log.Warnf("read option is too slow, key=<%s>, cost=<%d>",
+		log.Warningf("read option is too slow, key=<%s>, cost=<%d>",
 			key,
 			cost)
 	}
@@ -496,7 +496,7 @@ func (t *slowLogTxn) Commit() (*clientv3.TxnResponse, error) {
 
 	cost := time.Now().Sub(start)
 	if cost > DefaultSlowRequestTime {
-		log.Warnf("txn runs too slow, resp=<%+v> cost=<%s> errors:\n %+v",
+		log.Warningf("txn runs too slow, resp=<%+v> cost=<%s> errors:\n %+v",
 			resp,
 			cost,
 			err)

@@ -208,7 +208,7 @@ func (t *defaultReplicaTransport) doConnection(session goetty.IOSession) error {
 			if err == io.EOF {
 				log.Infof("closed by %s", remoteIP)
 			} else {
-				log.Warnf("read error from conn-%s, errors:\n%+v",
+				log.Warningf("read error from conn-%s, errors:\n%+v",
 					remoteIP,
 					err)
 			}

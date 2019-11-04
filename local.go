@@ -150,7 +150,7 @@ type defaultLocalStore struct {
 
 func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 	if len(initResources) == 0 {
-		log.Warnf("init with empty resources")
+		log.Warningf("init with empty resources")
 	}
 
 	data, err := ls.db.get(containerKey)
@@ -204,7 +204,7 @@ func (ls *defaultLocalStore) BootstrapCluster(initResources ...Resource) {
 			log.Fatal("bootstrap cluster failed with %+v", err)
 		}
 
-		log.Warnf("bootstrap cluster failed with %+v", err)
+		log.Warningf("bootstrap cluster failed with %+v", err)
 	}
 	if !ok {
 		log.Info("the cluster is already bootstrapped")
