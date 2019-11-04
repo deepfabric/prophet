@@ -101,8 +101,8 @@ func (w *Watcher) resetConnWithProphet(flag int) {
 			Flag: flag,
 		})
 		if err != nil {
-			time.Sleep(time.Millisecond * 200)
 			conn.Close()
+			time.Sleep(time.Millisecond * 200)
 			continue
 		}
 
@@ -125,6 +125,8 @@ func (w *Watcher) watchDog(flag int) {
 }
 
 func (w *Watcher) startReadLoop() {
+	expectSeq := uint64(0)
+
 	for {
 		msg, err := w.conn.Read()
 		if err != nil {
@@ -133,6 +135,17 @@ func (w *Watcher) startReadLoop() {
 		}
 
 		if evt, ok := msg.(*EventNotify); ok {
+			log.Infof("%d, %d", expectSeq, evt.Seq)
+			// we lost some event notify, close the conection, and retry
+			if expectSeq != evt.Seq {
+				log.Warnf("prophet: watch lost some event notify, expect seq %d, but %d, close and retry",
+					expectSeq,
+					evt.Seq)
+				w.conn.Close()
+				return
+			}
+
+			expectSeq = evt.Seq + 1
 			w.eventC <- evt
 		} else {
 			w.conn.Close()
