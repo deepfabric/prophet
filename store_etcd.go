@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fagongzi/goetty"
-
 	"github.com/coreos/etcd/clientv3"
+	"github.com/fagongzi/goetty"
 	"github.com/fagongzi/util/format"
 )
 
@@ -26,9 +25,7 @@ const (
 )
 
 var (
-	errMaybeNotLeader = errors.New("may be not leader")
-	errTxnFailed      = errors.New("failed to commit transaction")
-
+	errMaybeNotLeader    = errors.New("may be not leader")
 	errSchedulerExisted  = errors.New("scheduler is existed")
 	errSchedulerNotFound = errors.New("scheduler is not found")
 )
@@ -429,7 +426,7 @@ func (s *etcdStore) save(key, value string) error {
 	}
 
 	if !ok {
-		return errTxnFailed
+		return errMaybeNotLeader
 	}
 
 	return nil
@@ -442,7 +439,7 @@ func (s *etcdStore) create(key, value string) error {
 	}
 
 	if !resp.Succeeded {
-		return errTxnFailed
+		return errMaybeNotLeader
 	}
 
 	return nil

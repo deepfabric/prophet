@@ -349,7 +349,7 @@ func (p *defaultProphet) doConnection(conn goetty.IOSession) error {
 		}
 
 		if !p.isLeader() {
-			conn.WriteAndFlush(newErrorRsp(fmt.Errorf("not leader")))
+			conn.WriteAndFlush(newErrorRsp(errMaybeNotLeader))
 			continue
 		}
 
