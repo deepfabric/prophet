@@ -58,8 +58,17 @@ func newInitEvent(rt *Runtime) (*EventNotify, error) {
 	value := goetty.NewByteBuf(512)
 
 	snap := rt.snap()
-	value.WriteInt(len(snap.resources))
 	value.WriteInt(len(snap.containers))
+	value.WriteInt(len(snap.resources))
+
+	for _, v := range snap.containers {
+		data, err := v.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		value.WriteInt(len(data))
+		value.Write(data)
+	}
 
 	for _, v := range snap.resources {
 		data, err := v.Marshal()
@@ -73,15 +82,6 @@ func newInitEvent(rt *Runtime) (*EventNotify, error) {
 		} else {
 			value.WriteUint64(0)
 		}
-	}
-
-	for _, v := range snap.containers {
-		data, err := v.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		value.WriteInt(len(data))
-		value.Write(data)
 	}
 
 	_, data, _ := value.ReadAll()
@@ -139,20 +139,20 @@ func (evt *EventNotify) ReadInitEventValues(resourceF func([]byte, uint64), cont
 
 	buf := goetty.NewByteBuf(len(evt.Value))
 	buf.Write(evt.Value)
-	rn, _ := buf.ReadInt()
 	cn, _ := buf.ReadInt()
+	rn, _ := buf.ReadInt()
+
+	for i := 0; i < cn; i++ {
+		size, _ := buf.ReadInt()
+		_, data, _ := buf.ReadBytes(size)
+		containerF(data)
+	}
 
 	for i := 0; i < rn; i++ {
 		size, _ := buf.ReadInt()
 		_, data, _ := buf.ReadBytes(size - 8)
 		leader, _ := buf.ReadUInt64()
 		resourceF(data, leader)
-	}
-
-	for i := 0; i < cn; i++ {
-		size, _ := buf.ReadInt()
-		_, data, _ := buf.ReadBytes(size)
-		containerF(data)
 	}
 
 	buf.Release()
