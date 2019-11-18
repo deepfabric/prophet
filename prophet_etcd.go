@@ -237,7 +237,7 @@ func endpointStatus(cfg *embed.Config, c *clientv3.Client) (*clientv3.StatusResp
 	cancel()
 
 	if cost := time.Since(start); cost > DefaultSlowRequestTime {
-		log.Warnf("prophet: check etcd status failed, endpoint=<%s> resp=<%+v> cost<%s> errors:\n %+v",
+		log.Warningf("prophet: check etcd status failed, endpoint=<%s> resp=<%+v> cost<%s> errors:\n %+v",
 			endpoint,
 			resp,
 			cost,
@@ -289,7 +289,7 @@ func checkClusterID(localClusterID types.ID, um types.URLsMap) error {
 		trp.CloseIdleConnections()
 		if gerr != nil {
 			// Do not return error, because other members may be not ready.
-			log.Warnf("bootstrap: check etcd embed, may be member is not ready, member=<%s>",
+			log.Warningf("bootstrap: check etcd embed, may be member is not ready, member=<%s>",
 				u)
 			continue
 		}

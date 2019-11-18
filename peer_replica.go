@@ -330,7 +330,7 @@ func (pr *PeerReplica) becomeFollower() {
 
 	err := pr.cmds.Put(c)
 	if err != nil {
-		log.Warnf("%s add become follower event failed with %+v",
+		log.Warningf("%s add become follower event failed with %+v",
 			pr.tag,
 			err)
 		c.cb(nil, nil)

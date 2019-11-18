@@ -49,6 +49,10 @@ func (rpc *simpleRPC) wait(conn *clientConn) {
 	time.Sleep(time.Millisecond * 100)
 }
 
+func (rpc *simpleRPC) notLeaderErr(err error) bool {
+	return err != nil && err.Error() == errMaybeNotLeader.Error()
+}
+
 // AllocID returns uint64 id
 func (rpc *simpleRPC) AllocID() (uint64, error) {
 	for {
@@ -72,6 +76,12 @@ func (rpc *simpleRPC) AllocID() (uint64, error) {
 			}
 
 			if rsp, ok := value.(*allocIDRsp); ok {
+				if rpc.notLeaderErr(rsp.Err) {
+					log.Warningf("prophet: alloc id failed with not leader, retry")
+					rpc.wait(conn)
+					break
+				}
+
 				rpc.releaseConn(conn)
 				return rsp.ID, rsp.Err
 			}
@@ -104,6 +114,12 @@ func (rpc *simpleRPC) AskSplit(res Resource) (uint64, []uint64, error) {
 			}
 
 			if rsp, ok := value.(*askSplitRsp); ok {
+				if rpc.notLeaderErr(rsp.Err) {
+					log.Warningf("prophet: ask split failed with not leader, retry")
+					rpc.wait(conn)
+					break
+				}
+
 				rpc.releaseConn(conn)
 				return rsp.NewID, rsp.NewPeerIDs, rsp.Err
 			}

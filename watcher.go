@@ -2,6 +2,7 @@ package prophet
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/fagongzi/goetty"
 )
@@ -50,6 +51,7 @@ type InitWatcher struct {
 
 // EventNotify event notify
 type EventNotify struct {
+	Seq   uint64 `json:"seq"`
 	Event int    `json:"event"`
 	Value []byte `json:"value"`
 }
@@ -175,12 +177,14 @@ func (evt *EventNotify) ReadLeaderChangerValue() (uint64, uint64) {
 }
 
 type watcher struct {
+	seq  uint64
 	info *InitWatcher
 	conn goetty.IOSession
 }
 
 func (wt *watcher) notify(evt *EventNotify) {
 	if MatchEvent(evt.Event, wt.info.Flag) {
+		evt.Seq = atomic.AddUint64(&wt.seq, 1)
 		err := wt.conn.WriteAndFlush(evt)
 		if err != nil {
 			wt.conn.Close()

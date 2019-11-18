@@ -38,7 +38,7 @@ func newCoordinator(cfg *Cfg, runner *Runner, rt *Runtime) *Coordinator {
 
 func (c *Coordinator) start() {
 	if c.running {
-		log.Warnf("prophet: coordinator is already started.")
+		log.Warningf("prophet: coordinator is already started.")
 		return
 	}
 
