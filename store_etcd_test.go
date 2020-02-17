@@ -9,10 +9,14 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAlreadyBootstrapped(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	stopC, port, err := startTestSingleEtcd(t)
 	if err != nil {
 		assert.FailNowf(t, "start embed etcd failed", "error: %+v", err)
@@ -33,14 +37,26 @@ func TestAlreadyBootstrapped(t *testing.T) {
 	go e.ElectionLoop(context.Background(), math.MaxUint64, "node1", func() {}, func() {})
 	time.Sleep(time.Millisecond * 200)
 
-	store := newEtcdStore(client, nil, "node1", e)
+	store := newEtcdStore(client, newTestAdapter(ctrl), "node1", e)
 	yes, err := store.AlreadyBootstrapped()
 	assert.NoError(t, err, "TestAlreadyBootstrapped failed")
 	assert.False(t, yes, "TestAlreadyBootstrapped failed")
 
-	yes, err = store.PutBootstrapped(newTestContainer(), newTestResource())
+	var reses []Resource
+	for i := 0; i < 100; i++ {
+		res := newTestResource()
+		res.SetID(uint64(i + 1))
+		reses = append(reses, res)
+	}
+	yes, err = store.PutBootstrapped(newTestContainer(), reses...)
 	assert.NoError(t, err, "TestAlreadyBootstrapped failed")
 	assert.True(t, yes, "TestAlreadyBootstrapped failed")
+	c := 0
+	err = store.LoadResources(8, func(res Resource) {
+		c++
+	})
+	assert.NoError(t, err, "TestAlreadyBootstrapped failed")
+	assert.Equal(t, 100, c, "TestAlreadyBootstrapped failed")
 
 	yes, err = store.AlreadyBootstrapped()
 	assert.NoError(t, err, "TestAlreadyBootstrapped failed")

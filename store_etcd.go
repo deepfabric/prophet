@@ -275,15 +275,6 @@ func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) 
 	}
 	ops = append(ops, clientv3.OpPut(s.getKey(container.ID(), s.containerPath), string(meta)))
 
-	for _, res := range resources {
-		meta, err = res.Marshal()
-		if err != nil {
-			return false, err
-		}
-		ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
-	}
-
-	// txn
 	resp, err := s.client.Txn(ctx).
 		If(clientv3.Compare(clientv3.CreateRevision(s.clusterPath), "=", 0)).
 		Then(ops...).
@@ -296,6 +287,35 @@ func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) 
 	// already bootstrapped
 	if !resp.Succeeded {
 		return false, nil
+	}
+
+	ops = ops[:0]
+	for idx, res := range resources {
+		meta, err = res.Marshal()
+		if err != nil {
+			return false, err
+		}
+		ops = append(ops, clientv3.OpPut(s.getKey(res.ID(), s.resourcePath), string(meta)))
+
+		if idx > 0 && idx%16 == 0 {
+			resp, err = s.client.Txn(ctx).
+				Then(ops...).
+				Commit()
+			if err != nil {
+				return false, err
+			}
+
+			ops = ops[:0]
+		}
+	}
+
+	if len(ops) > 0 {
+		resp, err = s.client.Txn(ctx).
+			Then(ops...).
+			Commit()
+		if err != nil {
+			return false, err
+		}
 	}
 
 	return true, nil
