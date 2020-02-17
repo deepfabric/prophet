@@ -246,6 +246,15 @@ func (s *etcdStore) generate() (uint64, error) {
 	return max, nil
 }
 
+func (s *etcdStore) AlreadyBootstrapped() (bool, error) {
+	resp, err := s.get(s.clusterPath, clientv3.WithCountOnly())
+	if err != nil {
+		return false, nil
+	}
+
+	return resp.Count > 0, nil
+}
+
 // PutBootstrapped put cluster is bootstrapped
 func (s *etcdStore) PutBootstrapped(container Container, resources ...Resource) (bool, error) {
 	clusterID, err := s.AllocID()
