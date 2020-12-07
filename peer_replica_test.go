@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.etcd.io/etcd/clientv3"
 )
 
 func TestCreatePeerReplica(t *testing.T) {

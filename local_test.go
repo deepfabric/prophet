@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.etcd.io/etcd/clientv3"
 )
 
 func TestSetAndGet(t *testing.T) {
