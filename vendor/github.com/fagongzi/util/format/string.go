@@ -8,11 +8,16 @@ import (
 
 // ParseStrUInt64 str -> uint64
 func ParseStrUInt64(data string) (uint64, error) {
-	ret, err := strconv.ParseInt(data, 10, 64)
+	return strconv.ParseUint(data, 10, 64)
+}
+
+// ParseStrUInt32 str -> uint32
+func ParseStrUInt32(data string) (uint32, error) {
+	ret, err := strconv.ParseUint(data, 10, 32)
 	if err != nil {
 		return 0, err
 	}
-	return uint64(ret), nil
+	return uint32(ret), nil
 }
 
 // MustParseStrUInt64 str -> uint64
@@ -22,6 +27,21 @@ func MustParseStrUInt64(data string) uint64 {
 		buf := make([]byte, 4096)
 		runtime.Stack(buf, true)
 		log.Fatalf("parse to uint64 failed, data=<%s> errors:\n %+v \n %s",
+			data,
+			err,
+			buf)
+	}
+
+	return value
+}
+
+// MustParseStrUInt32 str -> uint32
+func MustParseStrUInt32(data string) uint32 {
+	value, err := ParseStrUInt32(data)
+	if err != nil {
+		buf := make([]byte, 4096)
+		runtime.Stack(buf, true)
+		log.Fatalf("parse to uint32 failed, data=<%s> errors:\n %+v \n %s",
 			data,
 			err,
 			buf)
@@ -141,4 +161,19 @@ func ParseStrUInt64Slice(data []string) ([]uint64, error) {
 	}
 
 	return target, nil
+}
+
+// Float64ToString float64 to str
+func Float64ToString(v float64) []byte {
+	return strconv.AppendFloat(nil, v, 'f', -1, 64)
+}
+
+// Int64ToString int64 to str
+func Int64ToString(v int64) []byte {
+	return strconv.AppendInt(nil, v, 10)
+}
+
+// UInt64ToString uint64 to str
+func UInt64ToString(v uint64) []byte {
+	return strconv.AppendUint(nil, v, 10)
 }
