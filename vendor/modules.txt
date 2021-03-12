@@ -1,32 +1,43 @@
+# github.com/BurntSushi/toml v0.3.1
+## explicit
+github.com/BurntSushi/toml
 # github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
 # github.com/coreos/go-semver v0.2.0
+## explicit
 github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 github.com/coreos/go-systemd/journal
 # github.com/coreos/pkg v0.0.0-20160727233714-3ac0863d7acf
-## explicit
 github.com/coreos/pkg/capnslog
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
+# github.com/docker/go-units v0.4.0
+## explicit
+github.com/docker/go-units
 # github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 github.com/dustin/go-humanize
-# github.com/fagongzi/goetty v1.6.1
+# github.com/fagongzi/goetty v2.0.1+incompatible
 ## explicit
 github.com/fagongzi/goetty
+github.com/fagongzi/goetty/buf
+github.com/fagongzi/goetty/codec
+github.com/fagongzi/goetty/codec/length
+github.com/fagongzi/goetty/queue
+github.com/fagongzi/goetty/timewheel
 # github.com/fagongzi/util v0.0.0-20201116094402-221cc40c4593
 ## explicit
 github.com/fagongzi/util/format
+github.com/fagongzi/util/hack
+github.com/fagongzi/util/protoc
 github.com/fagongzi/util/task
-# github.com/gogo/protobuf v1.2.1
+# github.com/gogo/protobuf v1.3.1
+## explicit
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-# github.com/golang/mock v1.4.4
-## explicit
-github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.3.3
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
@@ -41,6 +52,7 @@ github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0
+## explicit
 github.com/google/btree
 # github.com/google/uuid v1.0.0
 github.com/google/uuid
@@ -58,6 +70,9 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 github.com/jonboulle/clockwork
 # github.com/json-iterator/go v1.1.7
 github.com/json-iterator/go
+# github.com/juju/ratelimit v1.0.1
+## explicit
+github.com/juju/ratelimit
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -66,12 +81,20 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
+# github.com/montanaflynn/stats v0.6.4
+## explicit
+github.com/montanaflynn/stats
+# github.com/phf/go-queue v0.0.0-20170504031614-9abe38d0371d
+## explicit
+github.com/phf/go-queue/queue
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v1.0.0
+## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
+github.com/prometheus/client_golang/prometheus/push
 # github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.4.1
@@ -87,7 +110,7 @@ github.com/sirupsen/logrus
 github.com/soheilhy/cmux
 # github.com/spf13/pflag v1.0.1
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.3.0
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
@@ -257,6 +280,8 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+gopkg.in/yaml.v3
 # sigs.k8s.io/yaml v1.1.0
 sigs.k8s.io/yaml
 # go.etcd.io/etcd => github.com/deepfabric/etcd v0.0.0-20201207015257-3b4a2ca4cf64
