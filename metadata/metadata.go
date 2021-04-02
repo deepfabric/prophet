@@ -25,27 +25,12 @@ type Resource interface {
 	Epoch() metapb.ResourceEpoch
 	// SetEpoch set epoch
 	SetEpoch(metapb.ResourceEpoch)
-	// Stale returns true if the other resource is older than current resource
-	Stale(other Resource) bool
-	// Changed returns true if the other resource is newer than current resource
-	Changed(other Resource) bool
-	// Labels returns the label pairs that determine which the resources will be scheduled to which nodes
-	Labels() []metapb.Pair
 	// Clone returns the cloned value
 	Clone() Resource
-
-	// ScaleCompleted returns true if the current resource has been successfully scaled according to the specified container
-	ScaleCompleted(uint64) bool
-
 	// Marshal returns error if marshal failed
 	Marshal() ([]byte, error)
 	// Unmarshal returns error if unmarshal failed
 	Unmarshal(data []byte) error
-
-	// SupportRebalance support rebalance the resource
-	SupportRebalance() bool
-	// SupportTransferLeader support transfer leader
-	SupportTransferLeader() bool
 }
 
 // Container is an abstraction of the node in a distributed system.
