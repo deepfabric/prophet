@@ -230,7 +230,6 @@ message EventNotify {
     InitEventData          initEvent          = 3;
     ResourceEventData      resourceEvent      = 4;
     ContainerEventData     containerEvent     = 5;
-    LeaderChangedEventData leaderChangedEvent = 6;
 }
 
 // InitEventData init event data
@@ -242,18 +241,13 @@ message InitEventData {
 
 // ResourceEventData resource created or updated
 message ResourceEventData {
-    bytes data = 1;
+    bytes  data   = 1;
+    uint64 leader = 2;
 }
 
 // ContainerEventData container created or updated
 message ContainerEventData {
     bytes data = 1;
-}
-
-// LeaderChangedEventData leader changed
-message LeaderChangedEventData {
-    uint64 resourceID = 1;
-    uint64 leaderID   = 2;
 }
 
 // ChangePeer change peer

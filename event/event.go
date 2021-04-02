@@ -64,7 +64,8 @@ func NewResourceEvent(target metadata.Resource, leaderID uint64) rpcpb.EventNoti
 	return rpcpb.EventNotify{
 		Type: EventResource,
 		ResourceEvent: &rpcpb.ResourceEventData{
-			Data: value,
+			Data:   value,
+			Leader: leaderID,
 		},
 	}
 }
