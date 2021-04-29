@@ -18,12 +18,20 @@ func TestClientLeaderChange(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, id > 0)
 
+	// stop current leader
 	cluster[0].Stop()
-	// old leader not response
-	cluster[0].GetConfig().DisableResponse = true
+
+	for _, c := range cluster {
+		c.GetConfig().DisableResponse = true
+	}
+
 	// rpc timeout error
-	id, err = cluster[2].GetClient().AllocID()
+	_, err = cluster[2].GetClient().AllocID()
 	assert.Error(t, err)
+
+	for _, c := range cluster {
+		c.GetConfig().DisableResponse = false
+	}
 
 	id, err = cluster[2].GetClient().AllocID()
 	assert.NoError(t, err)

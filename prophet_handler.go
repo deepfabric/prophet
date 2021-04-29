@@ -54,64 +54,48 @@ func (p *defaultProphet) handleRPCRequest(rs goetty.IOSession, data interface{},
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeContainerHeartbeatReq:
 		resp.Type = rpcpb.TypeContainerHeartbeatRsp
 		err := p.handleContainerHeartbeat(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeAllocIDReq:
 		resp.Type = rpcpb.TypeAllocIDRsp
 		err := p.handleAllocID(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeGetContainerReq:
 		resp.Type = rpcpb.TypeGetContainerRsp
 		err := p.handleGetContainer(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeAskSplitReq:
 		resp.Type = rpcpb.TypeAskSplitRsp
 		err := p.handleAskSplit(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeReportSplitReq:
 		resp.Type = rpcpb.TypeReportSplitRsp
 		err := p.handleReportSplit(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeAskBatchSplitReq:
 		resp.Type = rpcpb.TypeAskBatchSplitRsp
 		err := p.handleAskBatchSplit(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeBatchReportSplitReq:
 		resp.Type = rpcpb.TypeBatchReportSplitRsp
 		err := p.handleReportBatchSplit(rc, req, resp)
 		if err != nil {
 			resp.Error = err.Error()
 		}
-
-		break
 	case rpcpb.TypeCreateWatcherReq:
 		doResponse = false
 		if p.wn != nil {
@@ -120,8 +104,6 @@ func (p *defaultProphet) handleRPCRequest(rs goetty.IOSession, data interface{},
 				return err
 			}
 		}
-
-		break
 	default:
 		return fmt.Errorf("type %s not support", req.Type.String())
 	}

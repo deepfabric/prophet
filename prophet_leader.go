@@ -7,9 +7,6 @@ import (
 func (p *defaultProphet) startLeaderLoop() {
 	go p.member.ElectionLoop(p.ctx)
 	<-p.completeC
-	p.client = NewClient(p.cfg.Adapter,
-		WithRPCTimeout(p.cfg.RPCTimeout.Duration),
-		WithLeaderGetter(p.GetLeader))
 }
 
 func (p *defaultProphet) enableLeader() error {
@@ -20,6 +17,7 @@ func (p *defaultProphet) enableLeader() error {
 		return err
 	}
 
+	p.initClient()
 	p.createEventNotifer()
 	p.notifyElectionComplete()
 	p.cfg.Handler.ProphetBecomeLeader()
@@ -29,7 +27,9 @@ func (p *defaultProphet) enableLeader() error {
 func (p *defaultProphet) disableLeader() error {
 	util.GetLogger().Infof("********%s become to follower now********", p.cfg.Name)
 
+	p.initClient()
 	p.stopRaftCluster()
+	p.stopEventNotifer()
 	p.notifyElectionComplete()
 	p.cfg.Handler.ProphetBecomeFollower()
 	return nil
@@ -62,4 +62,12 @@ func (p *defaultProphet) stopEventNotifer() {
 	if p.wn != nil {
 		p.wn.stop()
 	}
+}
+
+func (p *defaultProphet) initClient() {
+	p.clientOnce.Do(func() {
+		p.client = NewClient(p.cfg.Adapter,
+			WithRPCTimeout(p.cfg.RPCTimeout.Duration),
+			WithLeaderGetter(p.GetLeader))
+	})
 }

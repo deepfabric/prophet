@@ -352,9 +352,7 @@ func (c *asyncClient) asyncDo(req *rpcpb.Request, cb func(*rpcpb.Response, error
 func (c *asyncClient) do(ctx *ctx) {
 	ctx.req.ID = c.nextID()
 	c.contexts.Store(ctx.req.ID, ctx)
-	util.GetLogger().Debugf("before write %+v", ctx.req)
 	c.writeC <- ctx
-	util.GetLogger().Debugf("after write %+v", ctx.req)
 	util.DefaultTimeoutWheel().Schedule(c.opts.rpcTimeout, c.timeout, ctx.req.ID)
 }
 

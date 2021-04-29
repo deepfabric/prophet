@@ -74,9 +74,10 @@ type defaultProphet struct {
 	cluster      *cluster.RaftCluster
 
 	// rpc
-	hbStreams *hbstream.HeartbeatStreams
-	trans     goetty.NetApplication
-	client    Client
+	hbStreams  *hbstream.HeartbeatStreams
+	trans      goetty.NetApplication
+	client     Client
+	clientOnce sync.Once
 }
 
 // NewProphet returns a prophet instance
